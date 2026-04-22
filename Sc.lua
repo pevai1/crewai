@@ -1,2413 +1,1430 @@
+-- ╔══════════════════════════════════════════════╗
+-- ║         pev | STK  v5.0  — Master Loop       ║
+-- ║   Sistem mandor: 1 controller, no conflict   ║
+-- ╚══════════════════════════════════════════════╝
+
 if _G.PevGui then _G.PevGui:Destroy() end
+if _G.PevMasterRunning then _G.PevMasterRunning = false end
+task.wait(0.1)
 
 local player = game.Players.LocalPlayer
 local char   = player.Character or player.CharacterAdded:Wait()
 local hrp    = char:WaitForChild("HumanoidRootPart")
 local hum    = char:WaitForChild("Humanoid")
 
-if _G.FarmRunning     == nil then _G.FarmRunning     = false end
-if _G.EscapeRunning   == nil then _G.EscapeRunning   = false end
-if _G.ReviveRunning   == nil then _G.ReviveRunning   = false end
-if _G.KillRunning     == nil then _G.KillRunning     = false end
-if _G.SelfReviveRunning == nil then _G.SelfReviveRunning = false end
-if _G.KillerSafeOn   == nil then _G.KillerSafeOn   = false end
-if _G.WebhookURL      == nil then _G.WebhookURL      = ""   end
-if _G.WhEv_Loot       == nil then _G.WhEv_Loot       = false end
-if _G.WhEv_Batch      == nil then _G.WhEv_Batch      = false end
-if _G.WhEv_Timer      == nil then _G.WhEv_Timer      = false end
-if _G.SpeedHackOn     == nil then _G.SpeedHackOn     = false end
-if _G.SpeedValue      == nil then _G.SpeedValue      = 32   end
-if _G.JumpHackOn      == nil then _G.JumpHackOn      = false end
-if _G.JumpValue       == nil then _G.JumpValue       = 100  end
-if _G.DoubleJumpOn    == nil then _G.DoubleJumpOn    = false end
-
-local running         = false
-local reviveRunning   = false
-local killRunning     = false
-local selfReviveRunning = false
-local totalCollected  = 0
+-- ══════════════════════════════════════════════
+--  GLOBAL FLAGS
+-- ══════════════════════════════════════════════
+local function gdef(k,v) if _G[k]==nil then _G[k]=v end end
+gdef("FarmOn",       false)
+gdef("EscapeOn",     false)
+gdef("ReviveOn",     false)
+gdef("SelfReviveOn", false)
+gdef("KillOn",       false)
+gdef("KillerSafeOn", false)
+gdef("SpeedOn",      false)
+gdef("JumpOn",       false)
+gdef("DJOn",         false)
+gdef("SpeedVal",     32)
+gdef("JumpVal",      100)
+gdef("WebhookURL",   "")
+gdef("WhEv_Loot",    false)
+gdef("WhEv_Batch",   false)
 
 -- ══════════════════════════════════════════════
---  SAVE / LOAD CONFIG (writefile/readfile Delta)
+--  CONFIG SAVE / LOAD
 -- ══════════════════════════════════════════════
-local CONFIG_FILE = "pev_stk_config.json"
+local CFG = "pev_stk_v5.json"
+local HS  = game:GetService("HttpService")
 
 local function saveConfig()
     pcall(function()
-        local data = {
-            FarmRunning      = _G.FarmRunning,
-            EscapeRunning    = _G.EscapeRunning,
-            ReviveRunning    = _G.ReviveRunning,
-            KillRunning      = _G.KillRunning,
-            SelfReviveRunning= _G.SelfReviveRunning,
-            KillerSafeOn     = _G.KillerSafeOn,
-            WebhookURL       = _G.WebhookURL,
-            WhEv_Loot        = _G.WhEv_Loot,
-            WhEv_Batch       = _G.WhEv_Batch,
-            WhEv_Timer       = _G.WhEv_Timer,
-            SpeedValue       = _G.SpeedValue,
-            JumpValue        = _G.JumpValue,
-            SpeedHackOn      = _G.SpeedHackOn,
-            JumpHackOn       = _G.JumpHackOn,
-            DoubleJumpOn     = _G.DoubleJumpOn,
-        }
-        writefile(CONFIG_FILE, game:GetService("HttpService"):JSONEncode(data))
+        writefile(CFG, HS:JSONEncode({
+            FarmOn=_G.FarmOn, EscapeOn=_G.EscapeOn,
+            ReviveOn=_G.ReviveOn, SelfReviveOn=_G.SelfReviveOn,
+            KillOn=_G.KillOn, KillerSafeOn=_G.KillerSafeOn,
+            SpeedOn=_G.SpeedOn, JumpOn=_G.JumpOn, DJOn=_G.DJOn,
+            SpeedVal=_G.SpeedVal, JumpVal=_G.JumpVal,
+            WebhookURL=_G.WebhookURL,
+            WhEv_Loot=_G.WhEv_Loot, WhEv_Batch=_G.WhEv_Batch,
+        }))
     end)
 end
 
 local function loadConfig()
     pcall(function()
-        if isfile(CONFIG_FILE) then
-            local raw = readfile(CONFIG_FILE)
-            local data = game:GetService("HttpService"):JSONDecode(raw)
-            if data.FarmRunning       ~= nil then _G.FarmRunning       = data.FarmRunning       end
-            if data.EscapeRunning     ~= nil then _G.EscapeRunning     = data.EscapeRunning     end
-            if data.ReviveRunning     ~= nil then _G.ReviveRunning     = data.ReviveRunning     end
-            if data.KillRunning       ~= nil then _G.KillRunning       = data.KillRunning       end
-            if data.SelfReviveRunning ~= nil then _G.SelfReviveRunning = data.SelfReviveRunning end
-            if data.KillerSafeOn      ~= nil then _G.KillerSafeOn      = data.KillerSafeOn      end
-            if data.WebhookURL        ~= nil then _G.WebhookURL        = data.WebhookURL        end
-            if data.WhEv_Loot         ~= nil then _G.WhEv_Loot         = data.WhEv_Loot         end
-            if data.WhEv_Batch        ~= nil then _G.WhEv_Batch        = data.WhEv_Batch        end
-            if data.WhEv_Timer        ~= nil then _G.WhEv_Timer        = data.WhEv_Timer        end
-            if data.SpeedValue        ~= nil then _G.SpeedValue        = data.SpeedValue        end
-            if data.JumpValue         ~= nil then _G.JumpValue         = data.JumpValue         end
-            if data.SpeedHackOn       ~= nil then _G.SpeedHackOn       = data.SpeedHackOn       end
-            if data.JumpHackOn        ~= nil then _G.JumpHackOn        = data.JumpHackOn        end
-            if data.DoubleJumpOn      ~= nil then _G.DoubleJumpOn      = data.DoubleJumpOn      end
-        end
+        if not isfile(CFG) then return end
+        local d=HS:JSONDecode(readfile(CFG))
+        local keys={"FarmOn","EscapeOn","ReviveOn","SelfReviveOn","KillOn",
+                     "KillerSafeOn","SpeedOn","JumpOn","DJOn","SpeedVal",
+                     "JumpVal","WebhookURL","WhEv_Loot","WhEv_Batch"}
+        for _,k in ipairs(keys) do if d[k]~=nil then _G[k]=d[k] end end
     end)
 end
-
--- Load config sebelum GUI dibuat biar nilai awal sudah benar
 loadConfig()
 
--- forward declarations (diisi setelah UI dibuat)
-local setStatus = function() end
-local GUIPrint  = function() end
+-- ══════════════════════════════════════════════
+--  FORWARD DECLARATIONS
+-- ══════════════════════════════════════════════
+local setStatus   = function() end
 local updateStats = function() end
 
 -- ══════════════════════════════════════════════
---  SCREEN GUI
--- ══════════════════════════════════════════════
-local sg = Instance.new("ScreenGui")
-_G.PevGui = sg
-sg.Name = "PevSTK"
-sg.Parent = player.PlayerGui
-sg.ResetOnSpawn = false
-sg.IgnoreGuiInset = true
-
--- ══════════════════════════════════════════════
---  PALETTE — Pink/Rose dari HTML
+--  GUI COLORS
 -- ══════════════════════════════════════════════
 local C = {
-    bg      = Color3.fromRGB(15,  8, 12),
-    panel   = Color3.fromRGB(26, 14, 21),
-    sidebar = Color3.fromRGB(21, 11, 17),
-    card    = Color3.fromRGB(34, 16, 24),
-    card2   = Color3.fromRGB(42, 20, 32),
-    accent  = Color3.fromRGB(232,121,154),
-    accLt   = Color3.fromRGB(244,167,190),
-    accDim  = Color3.fromRGB(61,  21, 40),
-    green   = Color3.fromRGB(244,143,177),
-    red     = Color3.fromRGB(240, 98,146),
-    yellow  = Color3.fromRGB(255,205,210),
-    cyan    = Color3.fromRGB(206,147,216),
-    text    = Color3.fromRGB(253,232,239),
-    sub     = Color3.fromRGB(160,112,128),
-    muted   = Color3.fromRGB(92,  48, 69),
-    border  = Color3.fromRGB(60,  24, 42),
+    bg     = Color3.fromRGB(10,10,14),
+    panel  = Color3.fromRGB(18,18,26),
+    card   = Color3.fromRGB(26,26,36),
+    card2  = Color3.fromRGB(32,32,44),
+    accent = Color3.fromRGB(120,86,255),
+    accLt  = Color3.fromRGB(160,130,255),
+    accDim = Color3.fromRGB(40,30,80),
+    green  = Color3.fromRGB(80,220,140),
+    red    = Color3.fromRGB(220,70,90),
+    yellow = Color3.fromRGB(255,200,60),
+    cyan   = Color3.fromRGB(80,200,230),
+    text   = Color3.fromRGB(230,230,240),
+    sub    = Color3.fromRGB(120,120,140),
+    muted  = Color3.fromRGB(50,50,65),
+    border = Color3.fromRGB(40,40,58),
 }
 
 -- ══════════════════════════════════════════════
---  HELPERS
+--  GUI HELPERS
 -- ══════════════════════════════════════════════
-local function stroke(p, col, th)
-    local s = Instance.new("UIStroke", p)
-    s.Color = col or C.border
-    s.Thickness = th or 1
-    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local function corner(p,r) Instance.new("UICorner",p).CornerRadius=UDim.new(0,r or 8) end
+local function stroke(p,col,th)
+    local s=Instance.new("UIStroke",p)
+    s.Color=col or C.border s.Thickness=th or 1
+    s.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
 end
-
-local function corner(p, r)
-    Instance.new("UICorner", p).CornerRadius = UDim.new(0, r or 10)
-end
-
-local function newLabel(parent, text, size, color, bold, xalign)
-    local l = Instance.new("TextLabel")
-    l.Parent = parent
-    l.BackgroundTransparency = 1
-    l.Text = text
-    l.TextSize = size or 12
-    l.TextColor3 = color or C.text
-    l.Font = bold and Enum.Font.GothamBold or Enum.Font.Gotham
-    l.TextXAlignment = xalign or Enum.TextXAlignment.Center
+local function lbl(par,txt,sz,col,bold,xa)
+    local l=Instance.new("TextLabel")
+    l.Parent=par l.BackgroundTransparency=1 l.Text=txt
+    l.TextSize=sz or 12 l.TextColor3=col or C.text
+    l.Font=bold and Enum.Font.GothamBold or Enum.Font.Gotham
+    l.TextXAlignment=xa or Enum.TextXAlignment.Center
     return l
 end
-
--- ══════════════════════════════════════════════
---  TOUCH-SAFE CLICK (MouseButton1Click + Touch fallback)
--- ══════════════════════════════════════════════
-local function onTap(btn, fn)
+local function onTap(btn,fn)
     btn.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch or
-           i.UserInputType == Enum.UserInputType.MouseButton1 then
-            fn()
-        end
+        if i.UserInputType==Enum.UserInputType.Touch or
+           i.UserInputType==Enum.UserInputType.MouseButton1 then fn() end
     end)
 end
-
-local function makeDraggable(frame, handle)
-    local dragging, dragInput, dragStart, startPos
+local function drag(frame,handle)
+    local dragging,dragInput,dragStart,startPos
     handle.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch then
-            dragging  = true
-            dragStart = i.Position
-            startPos  = frame.Position
-            i.Changed:Connect(function()
-                if i.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+        if i.UserInputType==Enum.UserInputType.Touch then
+            dragging=true dragStart=i.Position startPos=frame.Position
+            i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
         end
     end)
     handle.InputChanged:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.Touch then dragInput = i end
+        if i.UserInputType==Enum.UserInputType.Touch then dragInput=i end
     end)
     game:GetService("UserInputService").InputChanged:Connect(function(i)
-        if i == dragInput and dragging then
-            local d = i.Position - dragStart
-            frame.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + d.X,
-                startPos.Y.Scale, startPos.Y.Offset + d.Y
-            )
+        if i==dragInput and dragging then
+            local d=i.Position-dragStart
+            frame.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y)
         end
     end)
 end
 
--- ══════════════════════════════════════════════
---  TOGGLE SWITCH FACTORY
--- ══════════════════════════════════════════════
-local function makeToggle(parent, xOff, activeColor)
-    local TW, TH = 38, 22
-    local KS = 16
-
-    local track = Instance.new("TextButton")
-    track.Parent = parent
-    track.Size = UDim2.new(0, TW, 0, TH)
-    track.Position = UDim2.new(1, xOff or -(TW + 10), 0.5, -TH/2)
-    track.BackgroundColor3 = C.muted
-    track.Text = ""
-    track.BorderSizePixel = 0
-    corner(track, 99)
-
-    local knob = Instance.new("Frame")
-    knob.Parent = track
-    knob.Size = UDim2.new(0, KS, 0, KS)
-    knob.Position = UDim2.new(0, 3, 0.5, -KS/2)
-    knob.BackgroundColor3 = C.text
-    knob.BorderSizePixel = 0
-    corner(knob, 99)
-
-    local state = false
-
-    local function setState(val)
-        state = val
-        local col = activeColor or C.green
-        track.BackgroundColor3 = val and col or C.muted
-        knob.Position = val
-            and UDim2.new(1, -(KS+3), 0.5, -KS/2)
-            or  UDim2.new(0, 3, 0.5, -KS/2)
+local function makeToggle(par,xOff,activeCol)
+    local TW,TH,KS=46,26,20
+    local track=Instance.new("TextButton",par)
+    track.Size=UDim2.new(0,TW,0,TH)
+    track.Position=UDim2.new(1,xOff or -(TW+10),0.5,-TH/2)
+    track.BackgroundColor3=C.muted track.Text="" track.BorderSizePixel=0
+    corner(track,99)
+    local knob=Instance.new("Frame",track)
+    knob.Size=UDim2.new(0,KS,0,KS)
+    knob.Position=UDim2.new(0,3,0.5,-KS/2)
+    knob.BackgroundColor3=C.text knob.BorderSizePixel=0
+    corner(knob,99)
+    local state=false
+    local function setState(v)
+        state=v
+        track.BackgroundColor3=v and (activeCol or C.green) or C.muted
+        knob.Position=v and UDim2.new(1,-(KS+3),0.5,-KS/2) or UDim2.new(0,3,0.5,-KS/2)
     end
-
-    local function getState() return state end
-
-    return track, setState, getState
+    return track,setState,function() return state end
 end
 
 -- ══════════════════════════════════════════════
---  MAIN WINDOW — 500 x 400
+--  MAIN WINDOW
 -- ══════════════════════════════════════════════
-local WIN_W = 500
-local WIN_H = 400
+local sg=Instance.new("ScreenGui")
+_G.PevGui=sg
+sg.Name="PevSTK" sg.ResetOnSpawn=false sg.IgnoreGuiInset=true
+sg.Parent=player.PlayerGui
 
-local win = Instance.new("Frame")
-win.Name = "PevWin"
-win.Parent = sg
-win.Size = UDim2.new(0, WIN_W, 0, WIN_H)
-win.Position = UDim2.new(0.02, 0, 0.03, 0)
-win.BackgroundColor3 = C.panel
-win.BorderSizePixel = 0
-corner(win, 14)
-stroke(win, C.border, 1)
+local win=Instance.new("Frame",sg)
+win.Name="PevWin"
+win.Size=UDim2.new(0,500,0,480)
+win.Position=UDim2.new(0.02,0,0.03,0)
+win.BackgroundColor3=C.panel win.BorderSizePixel=0
+corner(win,14) stroke(win,C.border,1)
 
--- ══════════════════════════════════════════════
---  TITLE BAR (44px) — mirip HTML
--- ══════════════════════════════════════════════
-local titlebar = Instance.new("Frame")
-titlebar.Parent = win
-titlebar.Size = UDim2.new(1, 0, 0, 44)
-titlebar.BackgroundColor3 = C.sidebar
-titlebar.BorderSizePixel = 0
-corner(titlebar, 14)
+-- titlebar
+local tb=Instance.new("Frame",win)
+tb.Size=UDim2.new(1,0,0,46) tb.BackgroundColor3=C.bg tb.BorderSizePixel=0 corner(tb,12)
+local tbFix=Instance.new("Frame",win)
+tbFix.Size=UDim2.new(1,0,0,10) tbFix.Position=UDim2.new(0,0,0,36)
+tbFix.BackgroundColor3=C.bg tbFix.BorderSizePixel=0
 
-local tbFix = Instance.new("Frame")
-tbFix.Parent = win
-tbFix.Size = UDim2.new(1, 0, 0, 10)
-tbFix.Position = UDim2.new(0, 0, 0, 34)
-tbFix.BackgroundColor3 = C.sidebar
-tbFix.BorderSizePixel = 0
+local brandDot=Instance.new("Frame",tb)
+brandDot.Size=UDim2.new(0,8,0,8) brandDot.Position=UDim2.new(0,14,0.5,-4)
+brandDot.BackgroundColor3=C.accent brandDot.BorderSizePixel=0 corner(brandDot,99)
 
-local tbBorderLine = Instance.new("Frame")
-tbBorderLine.Parent = win
-tbBorderLine.Size = UDim2.new(1, 0, 0, 1)
-tbBorderLine.Position = UDim2.new(0, 0, 0, 44)
-tbBorderLine.BackgroundColor3 = C.border
-tbBorderLine.BorderSizePixel = 0
+local brandL=lbl(tb,"pev | STK",13,C.text,true,Enum.TextXAlignment.Left)
+brandL.Size=UDim2.new(0,120,1,0) brandL.Position=UDim2.new(0,28,0,0)
 
--- brand icon (circle)
-local avatarF = Instance.new("Frame")
-avatarF.Parent = titlebar
-avatarF.Size = UDim2.new(0, 26, 0, 26)
-avatarF.Position = UDim2.new(0, 12, 0.5, -13)
-avatarF.BackgroundColor3 = Color3.fromRGB(42, 15, 26)
-avatarF.BorderSizePixel = 0
-corner(avatarF, 99)
-stroke(avatarF, Color3.fromRGB(122, 37, 69), 1.5)
-local avatarLbl = newLabel(avatarF, "P", 10, C.accLt, true)
-avatarLbl.Size = UDim2.new(1,0,1,0)
+local badge=Instance.new("Frame",tb)
+badge.Size=UDim2.new(0,42,0,18) badge.Position=UDim2.new(0,152,0.5,-9)
+badge.BackgroundColor3=C.accDim badge.BorderSizePixel=0 corner(badge,20)
+lbl(badge,"v5.0",10,C.accLt,true).Size=UDim2.new(1,0,1,0)
 
--- brand name
-local brandName = newLabel(titlebar, "pev | STK", 13, C.text, true, Enum.TextXAlignment.Left)
-brandName.Size = UDim2.new(0, 80, 1, 0)
-brandName.Position = UDim2.new(0, 46, 0, 0)
+local tbDot=Instance.new("Frame",tb)
+tbDot.Size=UDim2.new(0,7,0,7) tbDot.Position=UDim2.new(1,-100,0.5,-3)
+tbDot.BackgroundColor3=C.red tbDot.BorderSizePixel=0 corner(tbDot,99)
+local tbTxt=lbl(tb,"Idle",10,C.sub,false,Enum.TextXAlignment.Left)
+tbTxt.Size=UDim2.new(0,55,1,0) tbTxt.Position=UDim2.new(1,-90,0,0)
 
--- version badge
-local badgeF = Instance.new("Frame")
-badgeF.Parent = titlebar
-badgeF.Size = UDim2.new(0, 66, 0, 20)
-badgeF.Position = UDim2.new(0, 134, 0.5, -10)
-badgeF.BackgroundColor3 = C.accDim
-badgeF.BorderSizePixel = 0
-corner(badgeF, 20)
-stroke(badgeF, Color3.fromRGB(122, 37, 69), 1)
-local badgeTxt = newLabel(badgeF, "v3.0", 10, C.accLt, true)
-badgeTxt.Size = UDim2.new(1,0,1,0)
+local minBtn=Instance.new("TextButton",tb)
+minBtn.Size=UDim2.new(0,26,0,26) minBtn.Position=UDim2.new(1,-62,0.5,-13)
+minBtn.BackgroundColor3=C.accDim minBtn.Text="—"
+minBtn.TextColor3=C.sub minBtn.TextSize=11 minBtn.Font=Enum.Font.GothamBold
+minBtn.BorderSizePixel=0 corner(minBtn,6) stroke(minBtn,C.border,1)
 
--- status dot + text
-local tbDotF = Instance.new("Frame")
-tbDotF.Name = "TbDotF"
-tbDotF.Parent = titlebar
-tbDotF.Size = UDim2.new(0, 7, 0, 7)
-tbDotF.Position = UDim2.new(1, -90, 0.5, -3)
-tbDotF.BackgroundColor3 = C.red
-tbDotF.BorderSizePixel = 0
-corner(tbDotF, 99)
+local closeBtn=Instance.new("TextButton",tb)
+closeBtn.Size=UDim2.new(0,26,0,26) closeBtn.Position=UDim2.new(1,-32,0.5,-13)
+closeBtn.BackgroundColor3=C.accDim closeBtn.Text="✕"
+closeBtn.TextColor3=C.sub closeBtn.TextSize=11 closeBtn.Font=Enum.Font.GothamBold
+closeBtn.BorderSizePixel=0 corner(closeBtn,6) stroke(closeBtn,C.border,1)
 
-local tbDotTxt = newLabel(titlebar, "Idle", 10, C.sub, false, Enum.TextXAlignment.Left)
-tbDotTxt.Name = "TbDotTxt"
-tbDotTxt.Size = UDim2.new(0, 50, 1, 0)
-tbDotTxt.Position = UDim2.new(1, -80, 0, 0)
+local div=Instance.new("Frame",win)
+div.Size=UDim2.new(1,0,0,1) div.Position=UDim2.new(0,0,0,46)
+div.BackgroundColor3=C.border div.BorderSizePixel=0
 
--- minimize button
-local minimizeBtn = Instance.new("TextButton")
-minimizeBtn.Parent = titlebar
-minimizeBtn.Size = UDim2.new(0, 24, 0, 24)
-minimizeBtn.Position = UDim2.new(1, -62, 0.5, -12)
-minimizeBtn.BackgroundColor3 = C.accDim
-minimizeBtn.Text = "—"
-minimizeBtn.TextColor3 = C.sub
-minimizeBtn.TextSize = 11
-minimizeBtn.Font = Enum.Font.GothamBold
-minimizeBtn.BorderSizePixel = 0
-corner(minimizeBtn, 7)
-stroke(minimizeBtn, C.border, 1)
+local bubble=Instance.new("TextButton",sg)
+bubble.Size=UDim2.new(0,48,0,48) bubble.Position=UDim2.new(0,12,0.5,-24)
+bubble.BackgroundColor3=C.accDim bubble.Text="P"
+bubble.TextColor3=C.accLt bubble.TextSize=18 bubble.Font=Enum.Font.GothamBold
+bubble.BorderSizePixel=0 bubble.Visible=false bubble.ZIndex=10
+corner(bubble,99) stroke(bubble,C.accent,2)
+drag(bubble,bubble) drag(win,tb)
 
--- close button
-local closeBtn = Instance.new("TextButton")
-closeBtn.Parent = titlebar
-closeBtn.Size = UDim2.new(0, 24, 0, 24)
-closeBtn.Position = UDim2.new(1, -34, 0.5, -12)
-closeBtn.BackgroundColor3 = C.accDim
-closeBtn.Text = "✕"
-closeBtn.TextColor3 = C.sub
-closeBtn.TextSize = 11
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.BorderSizePixel = 0
-corner(closeBtn, 7)
-stroke(closeBtn, C.border, 1)
+-- body
+local body=Instance.new("Frame",win)
+body.Size=UDim2.new(1,0,1,-47) body.Position=UDim2.new(0,0,0,47)
+body.BackgroundTransparency=1
 
--- ── FLOATING BUBBLE (muncul saat minimize/hide) ──
-local bubble = Instance.new("TextButton")
-bubble.Parent = sg
-bubble.Size = UDim2.new(0, 52, 0, 52)
-bubble.Position = UDim2.new(0, 16, 0.5, -26)
-bubble.BackgroundColor3 = C.accDim
-bubble.Text = "P"
-bubble.TextColor3 = C.accLt
-bubble.TextSize = 20
-bubble.Font = Enum.Font.GothamBold
-bubble.BorderSizePixel = 0
-bubble.Visible = false
-bubble.ZIndex = 10
-corner(bubble, 99)
-stroke(bubble, C.accent, 2)
+-- sidebar
+local SBW=110
+local sb=Instance.new("Frame",body)
+sb.Size=UDim2.new(0,SBW,1,0) sb.BackgroundColor3=C.bg sb.BorderSizePixel=0
+local sbDiv=Instance.new("Frame",body)
+sbDiv.Size=UDim2.new(0,1,1,0) sbDiv.Position=UDim2.new(0,SBW,0,0)
+sbDiv.BackgroundColor3=C.border sbDiv.BorderSizePixel=0
 
-makeDraggable(bubble, bubble)
+local sbNav=Instance.new("Frame",sb)
+sbNav.Size=UDim2.new(1,-12,1,-50) sbNav.Position=UDim2.new(0,6,0,6)
+sbNav.BackgroundTransparency=1
+local sbLayout=Instance.new("UIListLayout",sbNav)
+sbLayout.SortOrder=Enum.SortOrder.LayoutOrder sbLayout.Padding=UDim.new(0,2)
 
-makeDraggable(win, titlebar)
+local sbPill=Instance.new("Frame",sb)
+sbPill.Size=UDim2.new(1,-12,0,34) sbPill.Position=UDim2.new(0,6,1,-40)
+sbPill.BackgroundColor3=C.card sbPill.BorderSizePixel=0
+corner(sbPill,8) stroke(sbPill,C.border,1)
+local sbDot2=Instance.new("Frame",sbPill)
+sbDot2.Size=UDim2.new(0,6,0,6) sbDot2.Position=UDim2.new(0,8,0.5,-3)
+sbDot2.BackgroundColor3=C.red sbDot2.BorderSizePixel=0 corner(sbDot2,99)
+local sbTxt=lbl(sbPill,"Idle",10,C.sub,false,Enum.TextXAlignment.Left)
+sbTxt.Size=UDim2.new(1,-20,1,0) sbTxt.Position=UDim2.new(0,18,0,0)
+
+local content=Instance.new("Frame",body)
+content.Size=UDim2.new(1,-(SBW+1),1,0) content.Position=UDim2.new(0,SBW+1,0,0)
+content.BackgroundTransparency=1
+
+local phdr=Instance.new("Frame",content)
+phdr.Size=UDim2.new(1,-16,0,36) phdr.Position=UDim2.new(0,8,0,4)
+phdr.BackgroundTransparency=1
+local panelTitle=lbl(phdr,"Main",13,C.text,true,Enum.TextXAlignment.Left)
+panelTitle.Size=UDim2.new(1,0,0.5,0)
+local panelSub=lbl(phdr,"Auto Farm & core features",10,C.sub,false,Enum.TextXAlignment.Left)
+panelSub.Size=UDim2.new(1,0,0.5,0) panelSub.Position=UDim2.new(0,0,0.5,0)
+
+local pdiv=Instance.new("Frame",content)
+pdiv.Size=UDim2.new(1,-16,0,1) pdiv.Position=UDim2.new(0,8,0,42)
+pdiv.BackgroundColor3=C.border pdiv.BorderSizePixel=0
+
+local scroll=Instance.new("ScrollingFrame",content)
+scroll.Size=UDim2.new(1,-8,1,-50) scroll.Position=UDim2.new(0,4,0,48)
+scroll.BackgroundTransparency=1 scroll.BorderSizePixel=0
+scroll.ScrollBarThickness=2 scroll.ScrollBarImageColor3=C.accent
+scroll.CanvasSize=UDim2.new(0,0,0,900)
 
 -- ══════════════════════════════════════════════
---  BODY = SIDEBAR + CONTENT
+--  NAV
 -- ══════════════════════════════════════════════
-local bodyF = Instance.new("Frame")
-bodyF.Parent = win
-bodyF.Size = UDim2.new(1, 0, 1, -45)
-bodyF.Position = UDim2.new(0, 0, 0, 45)
-bodyF.BackgroundTransparency = 1
-
--- ── SIDEBAR (118px) ──────────────────────────
-local SIDEBAR_W = 118
-
-local sidebar = Instance.new("Frame")
-sidebar.Parent = bodyF
-sidebar.Size = UDim2.new(0, SIDEBAR_W, 1, 0)
-sidebar.BackgroundColor3 = C.sidebar
-sidebar.BorderSizePixel = 0
-
-local sbRoundFix = Instance.new("Frame")
-sbRoundFix.Parent = bodyF
-sbRoundFix.Size = UDim2.new(0, SIDEBAR_W, 0, 14)
-sbRoundFix.Position = UDim2.new(0, 0, 1, -14)
-sbRoundFix.BackgroundColor3 = C.sidebar
-sbRoundFix.BorderSizePixel = 0
-corner(sbRoundFix, 14)
-
-local sbBorderLine = Instance.new("Frame")
-sbBorderLine.Parent = bodyF
-sbBorderLine.Size = UDim2.new(0, 1, 1, 0)
-sbBorderLine.Position = UDim2.new(0, SIDEBAR_W, 0, 0)
-sbBorderLine.BackgroundColor3 = C.border
-sbBorderLine.BorderSizePixel = 0
-
-local sbNavList = Instance.new("Frame")
-sbNavList.Parent = sidebar
-sbNavList.Size = UDim2.new(1, -16, 1, -56)
-sbNavList.Position = UDim2.new(0, 8, 0, 8)
-sbNavList.BackgroundTransparency = 1
-
-local sbListLayout = Instance.new("UIListLayout", sbNavList)
-sbListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-sbListLayout.Padding = UDim.new(0, 1)
-
--- sidebar bottom status card
-local sbBottom = Instance.new("Frame")
-sbBottom.Parent = sidebar
-sbBottom.Size = UDim2.new(1, -16, 0, 36)
-sbBottom.Position = UDim2.new(0, 8, 1, -44)
-sbBottom.BackgroundColor3 = C.card
-sbBottom.BorderSizePixel = 0
-corner(sbBottom, 8)
-stroke(sbBottom, C.border, 1)
-
-local sbDot = Instance.new("Frame")
-sbDot.Name = "SbDot"
-sbDot.Parent = sbBottom
-sbDot.Size = UDim2.new(0, 7, 0, 7)
-sbDot.Position = UDim2.new(0, 10, 0.5, -3)
-sbDot.BackgroundColor3 = C.red
-sbDot.BorderSizePixel = 0
-corner(sbDot, 99)
-
-local sbTxt = newLabel(sbBottom, "Idle", 11, C.sub, false, Enum.TextXAlignment.Left)
-sbTxt.Name = "SbTxt"
-sbTxt.Size = UDim2.new(1, -26, 1, 0)
-sbTxt.Position = UDim2.new(0, 22, 0, 0)
-
--- ── CONTENT AREA ────────────────────────────
-local contentArea = Instance.new("Frame")
-contentArea.Parent = bodyF
-contentArea.Size = UDim2.new(1, -(SIDEBAR_W+1), 1, 0)
-contentArea.Position = UDim2.new(0, SIDEBAR_W+1, 0, 0)
-contentArea.BackgroundTransparency = 1
-
--- panel header
-local panelHdr = Instance.new("Frame")
-panelHdr.Parent = contentArea
-panelHdr.Size = UDim2.new(1, -20, 0, 38)
-panelHdr.Position = UDim2.new(0, 10, 0, 6)
-panelHdr.BackgroundTransparency = 1
-
-local panelTitle = newLabel(panelHdr, "Main", 14, C.text, true, Enum.TextXAlignment.Left)
-panelTitle.Name = "PanelTitle"
-panelTitle.Size = UDim2.new(1, 0, 0.5, 0)
-
-local panelSub = newLabel(panelHdr, "Auto Farm & core features", 10, C.sub, false, Enum.TextXAlignment.Left)
-panelSub.Name = "PanelSub"
-panelSub.Size = UDim2.new(1, 0, 0.5, 0)
-panelSub.Position = UDim2.new(0, 0, 0.5, 0)
-
-local phDivLine = Instance.new("Frame")
-phDivLine.Parent = contentArea
-phDivLine.Size = UDim2.new(1, -20, 0, 1)
-phDivLine.Position = UDim2.new(0, 10, 0, 45)
-phDivLine.BackgroundColor3 = C.border
-phDivLine.BorderSizePixel = 0
-
-local pageScroll = Instance.new("ScrollingFrame")
-pageScroll.Parent = contentArea
-pageScroll.Size = UDim2.new(1, -10, 1, -52)
-pageScroll.Position = UDim2.new(0, 5, 0, 50)
-pageScroll.BackgroundTransparency = 1
-pageScroll.BorderSizePixel = 0
-pageScroll.ScrollBarThickness = 2
-pageScroll.ScrollBarImageColor3 = C.accent
-pageScroll.CanvasSize = UDim2.new(0, 0, 0, 900)
-
--- ══════════════════════════════════════════════
---  NAV ITEM FACTORY
--- ══════════════════════════════════════════════
-local navItems = {}
-local TAB_DATA = {
-    { id = "Main",   sym = "AF", label = "Main"   },
-    { id = "Player", sym = "PL", label = "Player" },
-    { id = "Visual", sym = "VS", label = "Visual" },
-    { id = "Misc",   sym = "MX", label = "Misc"   },
+local navItems={}
+local TAB_DATA={
+    {id="Main",   sym="AF", label="Main"},
+    {id="Player", sym="PL", label="Player"},
+    {id="Visual", sym="VS", label="Visual"},
+    {id="Misc",   sym="MX", label="Misc"},
 }
-local TAB_INFO = {
-    Main   = { title = "Main",   sub = "Auto Farm & core features"        },
-    Player = { title = "Player", sub = "Speed · Jump · Double Jump"       },
-    Visual = { title = "Visual", sub = "ESP highlight & world scan"       },
-    Misc   = { title = "Misc",   sub = "AFK · Timing Escape · Webhook"    },
+local TAB_INFO={
+    Main  ={title="Main",   sub="Auto Farm & core features"},
+    Player={title="Player", sub="Speed · Jump · Double Jump"},
+    Visual={title="Visual", sub="ESP highlight & world scan"},
+    Misc  ={title="Misc",   sub="AFK · Escape · Webhook"},
 }
-
-for i, td in ipairs(TAB_DATA) do
-    local navBtn = Instance.new("TextButton")
-    navBtn.Parent = sbNavList
-    navBtn.Size = UDim2.new(1, 0, 0, 38)
-    navBtn.LayoutOrder = i
-    navBtn.BackgroundTransparency = 1
-    navBtn.Text = ""
-    navBtn.BorderSizePixel = 0
-    corner(navBtn, 9)
-
-    -- active indicator bar (left side — sama kayak HTML)
-    local indBar = Instance.new("Frame")
-    indBar.Parent = navBtn
-    indBar.Size = UDim2.new(0, 2.5, 0.5, 0)
-    indBar.Position = UDim2.new(0, 0, 0.25, 0)
-    indBar.BackgroundColor3 = C.accent
-    indBar.BorderSizePixel = 0
-    corner(indBar, 3)
-    indBar.Visible = false
-
-    -- sym box (mirip .nav-sym di HTML)
-    local symL = newLabel(navBtn, td.sym, 9, C.accent, true)
-    symL.Size = UDim2.new(0, 22, 1, 0)
-    symL.Position = UDim2.new(0, 9, 0, 0)
-
-    local labelL = newLabel(navBtn, td.label, 12, C.sub, true, Enum.TextXAlignment.Left)
-    labelL.Size = UDim2.new(1, -36, 1, 0)
-    labelL.Position = UDim2.new(0, 34, 0, 0)
-
-    navItems[td.id] = { btn=navBtn, indBar=indBar, symL=symL, labelL=labelL }
+for i,td in ipairs(TAB_DATA) do
+    local btn=Instance.new("TextButton",sbNav)
+    btn.Size=UDim2.new(1,0,0,36) btn.LayoutOrder=i
+    btn.BackgroundTransparency=1 btn.Text="" btn.BorderSizePixel=0 corner(btn,8)
+    local bar=Instance.new("Frame",btn)
+    bar.Size=UDim2.new(0,3,0.5,0) bar.Position=UDim2.new(0,0,0.25,0)
+    bar.BackgroundColor3=C.accent bar.BorderSizePixel=0 corner(bar,3) bar.Visible=false
+    local symL=lbl(btn,td.sym,9,C.accent,true)
+    symL.Size=UDim2.new(0,22,1,0) symL.Position=UDim2.new(0,8,0,0)
+    local labL=lbl(btn,td.label,11,C.sub,true,Enum.TextXAlignment.Left)
+    labL.Size=UDim2.new(1,-34,1,0) labL.Position=UDim2.new(0,32,0,0)
+    navItems[td.id]={btn=btn,bar=bar,symL=symL,labL=labL}
 end
 
 -- ══════════════════════════════════════════════
---  PAGES
+--  PAGES & ROW FACTORY
 -- ══════════════════════════════════════════════
-local pages = {}
+local pages={}
 local function makePage()
-    local f = Instance.new("Frame")
-    f.Parent = pageScroll
-    f.Size = UDim2.new(1, 0, 0, 700)
-    f.Position = UDim2.new(10, 0, 0, 0) -- mulai di luar layar
-    f.BackgroundTransparency = 1
-    f.Visible = true
-    return f
+    local f=Instance.new("Frame",scroll)
+    f.Size=UDim2.new(1,0,0,700) f.Position=UDim2.new(10,0,0,0)
+    f.BackgroundTransparency=1 return f
 end
-
--- ══════════════════════════════════════════════
---  FEATURE ROW FACTORY (card style — mirip .row di HTML)
--- ══════════════════════════════════════════════
-local function makeFeatureRow(parent, yOff, sym, symColor, title, sub, comingSoon, toggleColor)
-    local ROW_H = 50
-    local row = Instance.new("Frame")
-    row.Parent = parent
-    row.Size = UDim2.new(1, -10, 0, ROW_H)
-    row.Position = UDim2.new(0, 5, 0, yOff)
-    row.BackgroundColor3 = C.card
-    row.BorderSizePixel = 0
-    corner(row, 9)
-    stroke(row, C.border, 1)
-
-    -- icon box (mirip .row-icon di HTML)
-    local iconF = Instance.new("Frame")
-    iconF.Parent = row
-    iconF.Size = UDim2.new(0, 28, 0, 28)
-    iconF.Position = UDim2.new(0, 8, 0.5, -14)
-    iconF.BackgroundColor3 = C.accDim
-    iconF.BorderSizePixel = 0
-    corner(iconF, 7)
-    local iconL = newLabel(iconF, sym, 9, symColor or C.accLt, true)
-    iconL.Size = UDim2.new(1,0,1,0)
-
-    local titleL = newLabel(row, title, 12, C.text, true, Enum.TextXAlignment.Left)
-    titleL.Size = UDim2.new(0, 160, 0, 18)
-    titleL.Position = UDim2.new(0, 44, 0, 8)
-
-    local subL = newLabel(row, sub, 10, C.sub, false, Enum.TextXAlignment.Left)
-    subL.Size = UDim2.new(0, 170, 0, 14)
-    subL.Position = UDim2.new(0, 44, 0, 27)
-
-    if comingSoon then
-        local csF = Instance.new("Frame")
-        csF.Parent = row
-        csF.Size = UDim2.new(0, 72, 0, 22)
-        csF.Position = UDim2.new(1, -80, 0.5, -11)
-        csF.BackgroundColor3 = C.accDim
-        csF.BorderSizePixel = 0
-        corner(csF, 20)
-        stroke(csF, C.border, 1)
-        local csL = newLabel(csF, "Soon", 10, C.sub, true)
-        csL.Size = UDim2.new(1,0,1,0)
-        return row, nil, nil, nil
-    else
-        local tgl, setState, getState = makeToggle(row, -(38 + 8), toggleColor)
-        return row, tgl, setState, getState
+local function makeRow(par,yOff,sym,symCol,title,sub,soon,togCol)
+    local row=Instance.new("Frame",par)
+    row.Size=UDim2.new(1,-8,0,54) row.Position=UDim2.new(0,4,0,yOff)
+    row.BackgroundColor3=C.card row.BorderSizePixel=0 corner(row,10) stroke(row,C.border,1)
+    local ico=Instance.new("Frame",row)
+    ico.Size=UDim2.new(0,32,0,32) ico.Position=UDim2.new(0,10,0.5,-16)
+    ico.BackgroundColor3=C.accDim ico.BorderSizePixel=0 corner(ico,8)
+    lbl(ico,sym,10,symCol or C.accLt,true).Size=UDim2.new(1,0,1,0)
+    local tL=lbl(row,title,13,C.text,true,Enum.TextXAlignment.Left)
+    tL.Size=UDim2.new(0,160,0,20) tL.Position=UDim2.new(0,50,0,8)
+    local sL=lbl(row,sub,10,C.sub,false,Enum.TextXAlignment.Left)
+    sL.Size=UDim2.new(0,165,0,15) sL.Position=UDim2.new(0,50,0,28)
+    if soon then
+        local sf=Instance.new("Frame",row)
+        sf.Size=UDim2.new(0,60,0,22) sf.Position=UDim2.new(1,-68,0.5,-11)
+        sf.BackgroundColor3=C.accDim sf.BorderSizePixel=0 corner(sf,20)
+        lbl(sf,"Soon",10,C.sub,true).Size=UDim2.new(1,0,1,0)
+        return row,nil,nil,nil
     end
+    local tgl,setState,getState=makeToggle(row,-(40+10),togCol)
+    return row,tgl,setState,getState
 end
 
 -- ══════════════════════════════════════════════
 --  PAGE: MAIN
 -- ══════════════════════════════════════════════
-pages.Main = makePage()
+pages.Main=makePage()
 
-local statusPill = Instance.new("Frame")
-statusPill.Parent = pages.Main
-statusPill.Size = UDim2.new(1, -10, 0, 28)
-statusPill.Position = UDim2.new(0, 5, 0, 0)
-statusPill.BackgroundColor3 = C.bg
-statusPill.BorderSizePixel = 0
-corner(statusPill, 8)
-stroke(statusPill, C.border, 1)
+local sPill=Instance.new("Frame",pages.Main)
+sPill.Size=UDim2.new(1,-8,0,32) sPill.Position=UDim2.new(0,4,0,0)
+sPill.BackgroundColor3=C.bg sPill.BorderSizePixel=0 corner(sPill,8) stroke(sPill,C.border,1)
+local sDot=Instance.new("Frame",sPill)
+sDot.Size=UDim2.new(0,8,0,8) sDot.Position=UDim2.new(0,10,0.5,-4)
+sDot.BackgroundColor3=C.red sDot.BorderSizePixel=0 corner(sDot,99)
+local statusLbl=lbl(sPill,"Idle — menunggu",12,C.sub,false,Enum.TextXAlignment.Left)
+statusLbl.Size=UDim2.new(1,-26,1,0) statusLbl.Position=UDim2.new(0,24,0,0)
 
-local sDot = Instance.new("Frame")
-sDot.Parent = statusPill
-sDot.Size = UDim2.new(0, 7, 0, 7)
-sDot.Position = UDim2.new(0, 10, 0.5, -3)
-sDot.BackgroundColor3 = C.red
-sDot.BorderSizePixel = 0
-corner(sDot, 99)
+-- priority indicator — nampilin siapa yang lagi dikerjain mandor
+local prioCard=Instance.new("Frame",pages.Main)
+prioCard.Size=UDim2.new(1,-8,0,30) prioCard.Position=UDim2.new(0,4,0,36)
+prioCard.BackgroundColor3=C.bg prioCard.BorderSizePixel=0 corner(prioCard,8) stroke(prioCard,C.border,1)
+local prioDot=Instance.new("Frame",prioCard)
+prioDot.Size=UDim2.new(0,6,0,6) prioDot.Position=UDim2.new(0,8,0.5,-3)
+prioDot.BackgroundColor3=C.muted prioDot.BorderSizePixel=0 corner(prioDot,99)
+local prioLbl=lbl(prioCard,"Mandor: Standby",10,C.sub,false,Enum.TextXAlignment.Left)
+prioLbl.Size=UDim2.new(1,-20,1,0) prioLbl.Position=UDim2.new(0,18,0,0)
 
-local statusLbl = newLabel(statusPill, "Idle — menunggu", 11, C.sub, false, Enum.TextXAlignment.Left)
-statusLbl.Size = UDim2.new(1, -26, 1, 0)
-statusLbl.Position = UDim2.new(0, 22, 0, 0)
+local statsRow=Instance.new("Frame",pages.Main)
+statsRow.Size=UDim2.new(1,-8,0,72) statsRow.Position=UDim2.new(0,4,0,70)
+statsRow.BackgroundTransparency=1 statsRow.BorderSizePixel=0
 
--- stats row
-local statsRow = Instance.new("Frame")
-statsRow.Parent = pages.Main
-statsRow.Size = UDim2.new(1, -10, 0, 42)
-statsRow.Position = UDim2.new(0, 5, 0, 34)
-statsRow.BackgroundTransparency = 1
-
-local function makeStatCard(parent, xScale, xOff, wScale, valCol, lbl)
-    local f = Instance.new("Frame")
-    f.Parent = parent
-    f.Size = UDim2.new(wScale, -4, 1, 0)
-    f.Position = UDim2.new(xScale, xOff, 0, 0)
-    f.BackgroundColor3 = C.bg
-    f.BorderSizePixel = 0
-    corner(f, 8)
-    stroke(f, C.border, 1)
-    local v = newLabel(f, "0", 14, valCol, true)
-    v.Size = UDim2.new(1, 0, 0.55, 0)
-    local l2 = newLabel(f, lbl, 9, C.sub, false)
-    l2.Size = UDim2.new(1, 0, 0.45, 0)
-    l2.Position = UDim2.new(0, 0, 0.55, 0)
-    return v
+local function statBox(par,xPct,xOff,label,col,initVal)
+    local GAP=4
+    local f=Instance.new("Frame",par)
+    f.Size=UDim2.new(0.333,-GAP,1,0) f.Position=UDim2.new(xPct,xOff+GAP/2,0,0)
+    f.BackgroundColor3=C.card f.BorderSizePixel=0 corner(f,10) stroke(f,C.border,1)
+    local bar=Instance.new("Frame",f)
+    bar.Size=UDim2.new(1,-16,0,2) bar.Position=UDim2.new(0,8,0,0)
+    bar.BackgroundColor3=col or C.accent bar.BorderSizePixel=0 corner(bar,2)
+    local vl=lbl(f,initVal or "0",16,col or C.accent,true)
+    vl.Size=UDim2.new(1,0,0,32) vl.Position=UDim2.new(0,0,0,8)
+    local ll=lbl(f,label,9,C.sub,false)
+    ll.Size=UDim2.new(1,0,0,18) ll.Position=UDim2.new(0,0,1,-20)
+    return vl
 end
 
-local s1val    = makeStatCard(statsRow, 0,     0, 0.333, C.green,  "Collected")
-local s2val    = makeStatCard(statsRow, 0.333, 4, 0.333, C.yellow, "Di Area")
-local timerVal = makeStatCard(statsRow, 0.666, 8, 0.334, C.cyan,   "Timer")
+local s1val=statBox(statsRow,0,0,"Collected",C.accent)
+local s2val=statBox(statsRow,0.333,0,"Found",C.green)
+local timerBox=Instance.new("Frame",statsRow)
+timerBox.Size=UDim2.new(0.333,-4,1,0) timerBox.Position=UDim2.new(0.666,2,0,0)
+timerBox.BackgroundColor3=C.card timerBox.BorderSizePixel=0 corner(timerBox,10) stroke(timerBox,C.border,1)
+local tbBar=Instance.new("Frame",timerBox)
+tbBar.Size=UDim2.new(1,-16,0,2) tbBar.Position=UDim2.new(0,8,0,0)
+tbBar.BackgroundColor3=C.cyan tbBar.BorderSizePixel=0 corner(tbBar,2)
+local timerVal=lbl(timerBox,"--:--",16,C.cyan,true)
+timerVal.Size=UDim2.new(1,0,0,32) timerVal.Position=UDim2.new(0,0,0,8)
+lbl(timerBox,"Timer",9,C.sub,false).Size=UDim2.new(1,0,0,18)
 
--- ── Section Helper: label pembatas ─────────────
-local function makeSectionLabel(parent, yOff, labelText, col)
-    local lineL = Instance.new("Frame")
-    lineL.Parent = parent
-    lineL.Size = UDim2.new(0, 18, 0, 1)
-    lineL.Position = UDim2.new(0, 5, 0, yOff + 8)
-    lineL.BackgroundColor3 = col or C.muted
-    lineL.BorderSizePixel = 0
+-- feature rows (Main)
+local _,farmTgl,    setFarmCb,    getFarmCb    =makeRow(pages.Main,148,"AF",C.green, "Auto Farm",   "Kumpulin loot otomatis",      false,C.green)
+local _,killerSTgl, setKillerSCb, getKillerSCb =makeRow(pages.Main,206,"KS",C.red,   "Killer Safe", "Hindari killer saat farm",    false,C.red)
+local _,escapeTgl,  setEscapeCb,  getEscapeCb  =makeRow(pages.Main,264,"AE",C.cyan,  "Auto Escape", "Teleport ke exit saat waktunya",false,C.cyan)
+local _,reviveTgl,  setReviveCb,  getReviveCb  =makeRow(pages.Main,322,"RV",C.yellow,"Auto Revive", "Revive teman knocked",        false,C.yellow)
+local _,selfRvTgl,  setSelfRvCb,  getSelfRvCb  =makeRow(pages.Main,380,"SR",C.accLt, "Self Revive", "Revive diri sendiri",         false,C.accLt)
+local _,killTgl,    setKillCb,    getKillCb    =makeRow(pages.Main,438,"KL",C.red,   "Auto Kill",   "Tarik survivor ke killer",    false,C.red)
 
-    local lbl = newLabel(parent, labelText, 9, col or C.muted, true, Enum.TextXAlignment.Left)
-    lbl.Size = UDim2.new(0, 80, 0, 16)
-    lbl.Position = UDim2.new(0, 26, 0, yOff)
-
-    local lineR = Instance.new("Frame")
-    lineR.Parent = parent
-    lineR.Size = UDim2.new(1, -114, 0, 1)
-    lineR.Position = UDim2.new(0, 108, 0, yOff + 8)
-    lineR.BackgroundColor3 = col or C.muted
-    lineR.BorderSizePixel = 0
-end
-
--- ── SECTION: SURVIVOR ───────────────────────
-makeSectionLabel(pages.Main, 82, "— SURVIVOR —", C.cyan)
-
-local _, farmTgl,       setFarmCb,       getFarmCb       = makeFeatureRow(pages.Main, 100, "AF", C.green,  "Auto Farm",        "Max 50 loot/batch · CD 2s",     false, C.green)
-local _, escapeTgl,     setEscapeCb,     getEscapeCb     = makeFeatureRow(pages.Main, 156, "AE", C.cyan,   "Auto Escape",      "Teleport ke ExitGateway",       false, C.cyan)
-local _, reviveTgl,     setReviveCb,     getReviveCb     = makeFeatureRow(pages.Main, 212, "RV", C.yellow, "Auto Revive",      "TP ke teman yang knocked",      false, C.yellow)
-local _, selfReviveTgl, setSelfReviveCb, getSelfReviveCb = makeFeatureRow(pages.Main, 268, "SR", C.cyan,   "Auto Self-Revive", "Cek killer sebelum revive",     false, C.cyan)
-
--- ── SECTION: KILLER ─────────────────────────
-makeSectionLabel(pages.Main, 332, "— KILLER —", C.red)
-
-local _, killTgl,       setKillCb,       getKillCb       = makeFeatureRow(pages.Main, 350, "AK", C.red,    "Auto Kill",        "Tarik player saat jadi killer", false, C.red)
-local _, killerSafeTgl, setKillerSafeCb, getKillerSafeCb = makeFeatureRow(pages.Main, 406, "KS", C.red,    "Killer Safe",      "TP jauh jika killer < 20 studs",false, C.red)
+-- escape status card
+local escCard=Instance.new("Frame",pages.Main)
+escCard.Size=UDim2.new(1,-8,0,52) escCard.Position=UDim2.new(0,4,0,500)
+escCard.BackgroundColor3=C.card escCard.BorderSizePixel=0 corner(escCard,10) stroke(escCard,C.border,1)
+local escDotDisp=Instance.new("Frame",escCard)
+escDotDisp.Size=UDim2.new(0,10,0,10) escDotDisp.Position=UDim2.new(0,12,0,12)
+escDotDisp.BackgroundColor3=C.muted escDotDisp.BorderSizePixel=0 corner(escDotDisp,99)
+local escStatusLbl=lbl(escCard,"Menunggu round...",11,C.sub,true,Enum.TextXAlignment.Left)
+escStatusLbl.Size=UDim2.new(1,-110,0,18) escStatusLbl.Position=UDim2.new(0,28,0,8)
+local escTimerDisp=lbl(escCard,"--:--",22,C.cyan,true,Enum.TextXAlignment.Right)
+escTimerDisp.Size=UDim2.new(0,88,1,0) escTimerDisp.Position=UDim2.new(1,-96,0,0)
+local escSubLbl=lbl(escCard,"Timer saat ini",9,C.sub,false,Enum.TextXAlignment.Left)
+escSubLbl.Size=UDim2.new(1,-110,0,14) escSubLbl.Position=UDim2.new(0,28,0,30)
 
 -- ══════════════════════════════════════════════
---  PAGE: PLAYER  (Speed / Jump / Double Jump)
+--  PAGE: PLAYER
 -- ══════════════════════════════════════════════
-pages.Player = makePage()
+pages.Player=makePage()
+local _,speedTgl,setSpeedCb,getSpeedCb=makeRow(pages.Player,0,"SP",C.green,"Speed Hack","WalkSpeed kustom",false,C.green)
+local _,jumpTgl, setJumpCb, getJumpCb =makeRow(pages.Player,62,"JP",C.cyan,"Jump Hack","JumpPower kustom",false,C.cyan)
+local _,djTgl,   setDJCb,   getDJCb   =makeRow(pages.Player,124,"DJ",C.yellow,"Double Jump","Lompat 2x",false,C.yellow)
 
--- ── Speed Hack ──────────────────────────────
-local _, speedTgl, setSpeedCb, getSpeedCb = makeFeatureRow(
-    pages.Player, 0, "SP", C.green, "Speed Hack", "Ubah WalkSpeed karakter", false, C.green
-)
-
-local speedCard = Instance.new("Frame")
-speedCard.Parent = pages.Player
-speedCard.Size = UDim2.new(1, -10, 0, 52)
-speedCard.Position = UDim2.new(0, 5, 0, 56)
-speedCard.BackgroundColor3 = C.card
-speedCard.BorderSizePixel = 0
-corner(speedCard, 9)
-stroke(speedCard, C.border, 1)
-
-local spLbl = newLabel(speedCard, "WalkSpeed", 11, C.sub, false, Enum.TextXAlignment.Left)
-spLbl.Size = UDim2.new(0, 100, 0.5, 0)
-spLbl.Position = UDim2.new(0, 12, 0, 0)
-
-local spValLbl = newLabel(speedCard, tostring(_G.SpeedValue), 13, C.accent, true, Enum.TextXAlignment.Right)
-spValLbl.Size = UDim2.new(0, 40, 0.5, 0)
-spValLbl.Position = UDim2.new(1, -52, 0, 0)
-
--- minus / plus buttons
-local spMinus = Instance.new("TextButton")
-spMinus.Parent = speedCard
-spMinus.Size = UDim2.new(0, 30, 0, 26)
-spMinus.Position = UDim2.new(0, 10, 0.5, 0)
-spMinus.BackgroundColor3 = C.accDim
-spMinus.Text = "−"
-spMinus.TextColor3 = C.accLt
-spMinus.TextSize = 14
-spMinus.Font = Enum.Font.GothamBold
-spMinus.BorderSizePixel = 0
-corner(spMinus, 7)
-
-local spPlus = Instance.new("TextButton")
-spPlus.Parent = speedCard
-spPlus.Size = UDim2.new(0, 30, 0, 26)
-spPlus.Position = UDim2.new(0, 46, 0.5, 0)
-spPlus.BackgroundColor3 = C.accDim
-spPlus.Text = "+"
-spPlus.TextColor3 = C.accLt
-spPlus.TextSize = 14
-spPlus.Font = Enum.Font.GothamBold
-spPlus.BorderSizePixel = 0
-corner(spPlus, 7)
-
-local spSlider = Instance.new("Frame")
-spSlider.Parent = speedCard
-spSlider.Size = UDim2.new(1, -96, 0, 8)
-spSlider.Position = UDim2.new(0, 86, 0.5, -4)
-spSlider.BackgroundColor3 = C.muted
-spSlider.BorderSizePixel = 0
-corner(spSlider, 4)
-stroke(spSlider, C.border, 1)
-
-local spFill = Instance.new("Frame")
-spFill.Parent = spSlider
-spFill.Size = UDim2.new(_G.SpeedValue / 100, 0, 1, 0)
-spFill.BackgroundColor3 = C.accent
-spFill.BorderSizePixel = 0
-corner(spFill, 4)
-
-local function applySpeed()
-    local c = player.Character
-    if not c then return end
-    local h = c:FindFirstChild("Humanoid")
-    if h then h.WalkSpeed = _G.SpeedValue end
-end
-
-local function updateSpeedUI()
-    spValLbl.Text = tostring(_G.SpeedValue)
-    spFill.Size = UDim2.new(math.clamp(_G.SpeedValue / 100, 0, 1), 0, 1, 0)
-    if getSpeedCb() then applySpeed() end
-end
-
-onTap(spMinus, function()
-    _G.SpeedValue = math.max(16, _G.SpeedValue - 8)
-    updateSpeedUI()
-    saveConfig()
-end)
-onTap(spPlus, function()
-    _G.SpeedValue = math.min(200, _G.SpeedValue + 8)
-    updateSpeedUI()
-    saveConfig()
-end)
-
-onTap(speedTgl, function()
-    local val = not getSpeedCb()
-    setSpeedCb(val)
-    _G.SpeedHackOn = val
-    if val then
-        applySpeed()
-        GUIPrint("⚡ Speed Hack ON — WalkSpeed ".._G.SpeedValue, C.green)
-    else
-        local c = player.Character
-        if c then
-            local h = c:FindFirstChild("Humanoid")
-            if h then h.WalkSpeed = 16 end
-        end
-        GUIPrint("⚡ Speed Hack OFF", C.sub)
-    end
-    saveConfig()
-end)
-
--- ── Jump Hack ───────────────────────────────
-local _, jumpTgl, setJumpCb, getJumpCb = makeFeatureRow(
-    pages.Player, 114, "JH", C.yellow, "Jump Hack", "Ubah JumpPower karakter", false, C.yellow
-)
-
-local jumpCard = Instance.new("Frame")
-jumpCard.Parent = pages.Player
-jumpCard.Size = UDim2.new(1, -10, 0, 52)
-jumpCard.Position = UDim2.new(0, 5, 0, 170)
-jumpCard.BackgroundColor3 = C.card
-jumpCard.BorderSizePixel = 0
-corner(jumpCard, 9)
-stroke(jumpCard, C.border, 1)
-
-local jpLbl = newLabel(jumpCard, "JumpPower", 11, C.sub, false, Enum.TextXAlignment.Left)
-jpLbl.Size = UDim2.new(0, 100, 0.5, 0)
-jpLbl.Position = UDim2.new(0, 12, 0, 0)
-
-local jpValLbl = newLabel(jumpCard, tostring(_G.JumpValue), 13, C.yellow, true, Enum.TextXAlignment.Right)
-jpValLbl.Size = UDim2.new(0, 40, 0.5, 0)
-jpValLbl.Position = UDim2.new(1, -52, 0, 0)
-
-local jpMinus = Instance.new("TextButton")
-jpMinus.Parent = jumpCard
-jpMinus.Size = UDim2.new(0, 30, 0, 26)
-jpMinus.Position = UDim2.new(0, 10, 0.5, 0)
-jpMinus.BackgroundColor3 = C.accDim
-jpMinus.Text = "−"
-jpMinus.TextColor3 = C.accLt
-jpMinus.TextSize = 14
-jpMinus.Font = Enum.Font.GothamBold
-jpMinus.BorderSizePixel = 0
-corner(jpMinus, 7)
-
-local jpPlus = Instance.new("TextButton")
-jpPlus.Parent = jumpCard
-jpPlus.Size = UDim2.new(0, 30, 0, 26)
-jpPlus.Position = UDim2.new(0, 46, 0.5, 0)
-jpPlus.BackgroundColor3 = C.accDim
-jpPlus.Text = "+"
-jpPlus.TextColor3 = C.accLt
-jpPlus.TextSize = 14
-jpPlus.Font = Enum.Font.GothamBold
-jpPlus.BorderSizePixel = 0
-corner(jpPlus, 7)
-
-local jpSlider = Instance.new("Frame")
-jpSlider.Parent = jumpCard
-jpSlider.Size = UDim2.new(1, -96, 0, 8)
-jpSlider.Position = UDim2.new(0, 86, 0.5, -4)
-jpSlider.BackgroundColor3 = C.muted
-jpSlider.BorderSizePixel = 0
-corner(jpSlider, 4)
-stroke(jpSlider, C.border, 1)
-
-local jpFill = Instance.new("Frame")
-jpFill.Parent = jpSlider
-jpFill.Size = UDim2.new(_G.JumpValue / 300, 0, 1, 0)
-jpFill.BackgroundColor3 = C.yellow
-jpFill.BorderSizePixel = 0
-corner(jpFill, 4)
-
-local function applyJump()
-    local c = player.Character
-    if not c then return end
-    local h = c:FindFirstChild("Humanoid")
-    if h then h.JumpPower = _G.JumpValue end
-end
-
-local function updateJumpUI()
-    jpValLbl.Text = tostring(_G.JumpValue)
-    jpFill.Size = UDim2.new(math.clamp(_G.JumpValue / 300, 0, 1), 0, 1, 0)
-    if getJumpCb() then applyJump() end
-end
-
-onTap(jpMinus, function()
-    _G.JumpValue = math.max(7, _G.JumpValue - 10)
-    updateJumpUI()
-    saveConfig()
-end)
-onTap(jpPlus, function()
-    _G.JumpValue = math.min(300, _G.JumpValue + 10)
-    updateJumpUI()
-    saveConfig()
-end)
-
-onTap(jumpTgl, function()
-    local val = not getJumpCb()
-    setJumpCb(val)
-    _G.JumpHackOn = val
-    if val then
-        applyJump()
-        GUIPrint("🦘 Jump Hack ON — JumpPower ".._G.JumpValue, C.yellow)
-    else
-        local c = player.Character
-        if c then
-            local h = c:FindFirstChild("Humanoid")
-            if h then h.JumpPower = 7.2 end
-        end
-        GUIPrint("🦘 Jump Hack OFF", C.sub)
-    end
-    saveConfig()
-end)
-
--- ── Double Jump ─────────────────────────────
-local _, djTgl, setDjCb, getDjCb = makeFeatureRow(
-    pages.Player, 228, "DJ", C.cyan, "Double Jump", "Tekan jump lagi saat di udara", false, C.cyan
-)
-
-local djConn
-local djCanJump = false
-
-local function enableDoubleJump()
-    local UIS = game:GetService("UserInputService")
-    djConn = UIS.JumpRequest:Connect(function()
-        local c = player.Character
-        if not c then return end
-        local h = c:FindFirstChild("Humanoid")
-        local hrpC = c:FindFirstChild("HumanoidRootPart")
-        if not h or not hrpC then return end
-        if h:GetState() == Enum.HumanoidStateType.Freefall and djCanJump then
-            djCanJump = false
-            hrpC.Velocity = Vector3.new(hrpC.Velocity.X, _G.JumpValue * 0.6, hrpC.Velocity.Z)
-            GUIPrint("🌀 Double Jump!", C.cyan)
+local function makeSliderCard(par,yOff,label,initVal,minV,maxV,col,onChange)
+    local card=Instance.new("Frame",par)
+    card.Size=UDim2.new(1,-8,0,64) card.Position=UDim2.new(0,4,0,yOff)
+    card.BackgroundColor3=C.card card.BorderSizePixel=0 corner(card,10) stroke(card,C.border,1)
+    local lLeft=lbl(card,label,11,C.sub,false,Enum.TextXAlignment.Left)
+    lLeft.Size=UDim2.new(0,54,0,20) lLeft.Position=UDim2.new(0,12,0,8)
+    local valLbl=lbl(card,tostring(initVal),18,col,true,Enum.TextXAlignment.Right)
+    valLbl.Size=UDim2.new(1,-12,0,20) valLbl.Position=UDim2.new(0,0,0,8)
+    local slider=Instance.new("TextButton",card)
+    slider.Size=UDim2.new(1,-24,0,18) slider.Position=UDim2.new(0,12,0,36)
+    slider.BackgroundColor3=C.muted slider.Text="" slider.BorderSizePixel=0 corner(slider,6)
+    local fill=Instance.new("Frame",slider)
+    fill.Size=UDim2.new((initVal-minV)/(maxV-minV),0,1,0)
+    fill.BackgroundColor3=col fill.BorderSizePixel=0 corner(fill,6)
+    local dragging=false
+    slider.InputBegan:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true end
+    end)
+    slider.InputEnded:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end
+    end)
+    game:GetService("UserInputService").InputChanged:Connect(function(i)
+        if not dragging then return end
+        if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseMove then
+            local rel=math.clamp((i.Position.X-slider.AbsolutePosition.X)/slider.AbsoluteSize.X,0,1)
+            local val=math.floor(minV+(maxV-minV)*rel)
+            fill.Size=UDim2.new(rel,0,1,0) valLbl.Text=tostring(val)
+            onChange(val)
         end
     end)
-    -- reset djCanJump saat landing atau jumping
-    game:GetService("RunService").Heartbeat:Connect(function()
-        if not getDjCb() then return end
-        local c = player.Character
-        if not c then return end
-        local h = c:FindFirstChild("Humanoid")
-        if not h then return end
-        local st = h:GetState()
-        if st == Enum.HumanoidStateType.Jumping then
-            djCanJump = true
-        elseif st == Enum.HumanoidStateType.Landed then
-            djCanJump = true
-        end
-    end)
+    return valLbl
 end
 
-onTap(djTgl, function()
-    local val = not getDjCb()
-    setDjCb(val)
-    _G.DoubleJumpOn = val
-    if val then
-        djCanJump = true
-        enableDoubleJump()
-        GUIPrint("🌀 Double Jump ON", C.cyan)
-    else
-        if djConn then djConn:Disconnect() djConn = nil end
-        GUIPrint("🌀 Double Jump OFF", C.sub)
-    end
-    saveConfig()
+makeSliderCard(pages.Player,186,"Speed",_G.SpeedVal,16,216,C.accent,function(v)
+    _G.SpeedVal=v if getSpeedCb() and hum then hum.WalkSpeed=v end saveConfig()
+end)
+makeSliderCard(pages.Player,258,"Jump",_G.JumpVal,7,507,C.cyan,function(v)
+    _G.JumpVal=v if getJumpCb() and hum then hum.JumpPower=v end saveConfig()
 end)
 
-if _G.DoubleJumpOn then
-    setDjCb(true)
-    djCanJump = true
-    enableDoubleJump()
-end
-
-if _G.SpeedHackOn then
-    setSpeedCb(true)
-    applySpeed()
-end
-
-if _G.JumpHackOn then
-    setJumpCb(true)
-    applyJump()
-end
-
 -- ══════════════════════════════════════════════
---  PAGE: VISUAL — ESP
+--  PAGE: VISUAL (ESP)
 -- ══════════════════════════════════════════════
-pages.Visual = makePage()
-
-local espHighlights = { Killer={}, Loot={}, Survivor={} }
-local espActive     = { Killer=false, Loot=false, Survivor=false }
-
-local espColors = {
-    Killer   = { fill = Color3.fromRGB(240,98,146),   outline = Color3.fromRGB(255,140,170) },
-    Loot     = { fill = Color3.fromRGB(255,205,210),  outline = Color3.fromRGB(255,230,235) },
-    Survivor = { fill = Color3.fromRGB(206,147,216),  outline = Color3.fromRGB(220,180,235) },
-}
-
-local function isLootModel(obj)
-    if not obj:IsA("Model") then return false end
-    local p = obj.Parent
-    if not p then return false end
-    return p.Name:match("^%d+$") ~= nil
+pages.Visual=makePage()
+local espActive={player=false,killer=false}
+local espObjs  ={player={},killer={}}
+local function clearESP(t)
+    for _,v in ipairs(espObjs[t]) do pcall(function() v:Destroy() end) end espObjs[t]={}
 end
-
-local function getTargets(espType)
-    local targets = {}
-    if espType == "Killer" then
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
-                local name = obj.Name:lower()
-                if name:find("killer") or name:find("monster") or name:find("enemy") then
-                    table.insert(targets, obj)
+local function makeHighlight(obj,col)
+    local h=Instance.new("SelectionBox")
+    h.Adornee=obj h.Color3=col h.LineThickness=0.05
+    h.SurfaceColor3=col h.SurfaceTransparency=0.7 h.Parent=sg return h
+end
+local espConn=nil
+local function startESP()
+    if espConn then espConn:Disconnect() end
+    espConn=game:GetService("RunService").Heartbeat:Connect(function()
+        if espActive.player then
+            clearESP("player")
+            for _,p in ipairs(game.Players:GetPlayers()) do
+                if p~=player and p.Character then
+                    local ok,h=pcall(makeHighlight,p.Character,Color3.fromRGB(80,180,255))
+                    if ok then table.insert(espObjs.player,h) end
                 end
             end
         end
-    elseif espType == "Loot" then
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if isLootModel(obj) then table.insert(targets, obj) end
-        end
-    elseif espType == "Survivor" then
-        for _, p in ipairs(game.Players:GetPlayers()) do
-            if p ~= player and p.Character then
-                table.insert(targets, p.Character)
-            end
-        end
-    end
-    return targets
-end
-
-local function clearESP(espType)
-    for _, hl in ipairs(espHighlights[espType]) do
-        pcall(function() hl:Destroy() end)
-    end
-    espHighlights[espType] = {}
-end
-
-local function applyESP(espType)
-    clearESP(espType)
-    local col = espColors[espType]
-    task.spawn(function()
-        while espActive[espType] do
-            local keep = {}
-            for _, hl in ipairs(espHighlights[espType]) do
-                if hl and hl.Parent then table.insert(keep, hl) end
-            end
-            espHighlights[espType] = keep
-            local existing = {}
-            for _, hl in ipairs(espHighlights[espType]) do
-                if hl.Adornee then existing[hl.Adornee] = true end
-            end
-            for _, target in ipairs(getTargets(espType)) do
-                if not existing[target] then
-                    local hl = Instance.new("Highlight")
-                    hl.Adornee = target
-                    hl.FillColor = col.fill
-                    hl.OutlineColor = col.outline
-                    hl.FillTransparency = 0.45
-                    hl.OutlineTransparency = 0
-                    hl.Parent = target
-                    table.insert(espHighlights[espType], hl)
+        if espActive.killer then
+            clearESP("killer")
+            for _,obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
+                    local n=obj.Name:lower()
+                    if n:find("killer") or n:find("monster") then
+                        local ok,h=pcall(makeHighlight,obj,Color3.fromRGB(255,60,60))
+                        if ok then table.insert(espObjs.killer,h) end
+                    end
                 end
             end
-            task.wait(2)
+        end
+        if not espActive.player and not espActive.killer then
+            if espConn then espConn:Disconnect() espConn=nil end
         end
     end)
 end
 
-local espSectionLbl = newLabel(pages.Visual, "ESP Highlight", 9.5, C.muted, true, Enum.TextXAlignment.Left)
-espSectionLbl.Size = UDim2.new(1, -10, 0, 20)
-espSectionLbl.Position = UDim2.new(0, 5, 0, 2)
-
-local espDefs = {
-    {"KL", C.red,    "ESP Killer",   "Red highlight killer di map",   "Killer"},
-    {"LT", C.yellow, "ESP Loot",     "Yellow highlight semua loot",   "Loot"},
-    {"SV", C.cyan,   "ESP Survivor", "Cyan highlight semua survivor", "Survivor"},
-}
-
-for i, def in ipairs(espDefs) do
-    local sym, col, title, sub, espType = def[1], def[2], def[3], def[4], def[5]
-    local _, tgl, setCb, getCb = makeFeatureRow(pages.Visual, 22 + (i-1)*56, sym, col, title, sub, false, col)
-    onTap(tgl, function()
-        local val = not getCb()
-        setCb(val)
-        espActive[espType] = val
-        if val then
-            applyESP(espType)
-            GUIPrint("👁 "..title.." ON", col)
-        else
-            clearESP(espType)
-            GUIPrint("👁 "..title.." OFF", C.sub)
-        end
-    end)
-end
+local _,espPlrTgl,setEspPlrCb,getEspPlrCb=makeRow(pages.Visual,0,"EP",C.cyan,"Player ESP","Highlight semua player",false,C.cyan)
+local _,espKillTgl,setEspKillCb,getEspKillCb=makeRow(pages.Visual,62,"EK",C.red,"Killer ESP","Highlight killer",false,C.red)
+onTap(espPlrTgl,function()
+    local v=not getEspPlrCb() setEspPlrCb(v) espActive.player=v
+    if v then startESP() else clearESP("player") end
+end)
+onTap(espKillTgl,function()
+    local v=not getEspKillCb() setEspKillCb(v) espActive.killer=v
+    if v then startESP() else clearESP("killer") end
+end)
 
 -- ══════════════════════════════════════════════
 --  PAGE: MISC
 -- ══════════════════════════════════════════════
-pages.Misc = makePage()
+pages.Misc=makePage()
+local afkConn=nil
+local _,afkTgl,setAfkCb,getAfkCb=makeRow(pages.Misc,0,"AK",C.yellow,"AFK Mode","Anti kick AFK",false,C.yellow)
 
--- AFK Mode
-local _, afkTgl, setAfkCb, getAfkCb = makeFeatureRow(
-    pages.Misc, 0, "AK", C.cyan, "AFK Mode", "Anti-kick saat idle", false, C.cyan
-)
-local afkConn
-onTap(afkTgl, function()
-    local val = not getAfkCb()
-    setAfkCb(val)
-    if val then
-        -- Gerakin karakter micro-movement tiap 25 detik biar ga ke-kick idle
-        -- Cara yang beneran works: listen Idled event lalu simulate input via VirtualUser
-        local VU = game:GetService("VirtualUser")
-        afkConn = game:GetService("Players").LocalPlayer.Idled:Connect(function()
-            VU:CaptureController()
-            VU:ClickButton2(Vector2.new(0, 0))
-        end)
-        GUIPrint("🌙 AFK Mode ON", C.cyan)
-    else
-        if afkConn then afkConn:Disconnect() afkConn = nil end
-        GUIPrint("🌙 AFK Mode OFF", C.sub)
-    end
+local whCard=Instance.new("Frame",pages.Misc)
+whCard.Size=UDim2.new(1,-8,0,190) whCard.Position=UDim2.new(0,4,0,62)
+whCard.BackgroundColor3=C.card whCard.BorderSizePixel=0 corner(whCard,10) stroke(whCard,C.border,1)
+lbl(whCard,"🔔  Webhook Discord",13,C.text,true,Enum.TextXAlignment.Left).Size=UDim2.new(1,-16,0,24)
+local wlb=whCard:FindFirstChildWhichIsA("TextLabel") wlb.Position=UDim2.new(0,12,0,10)
+local whBg=Instance.new("Frame",whCard)
+whBg.Size=UDim2.new(1,-24,0,30) whBg.Position=UDim2.new(0,12,0,40)
+whBg.BackgroundColor3=C.bg whBg.BorderSizePixel=0 corner(whBg,8) stroke(whBg,C.border,1)
+local webhookBox=Instance.new("TextBox",whBg)
+webhookBox.Size=UDim2.new(1,-16,1,0) webhookBox.Position=UDim2.new(0,10,0,0)
+webhookBox.BackgroundTransparency=1
+webhookBox.PlaceholderText="https://discord.com/api/webhooks/..."
+webhookBox.Text=_G.WebhookURL or ""
+webhookBox.TextColor3=C.text webhookBox.PlaceholderColor3=C.sub
+webhookBox.TextSize=10 webhookBox.Font=Enum.Font.Gotham
+webhookBox.TextXAlignment=Enum.TextXAlignment.Left webhookBox.ClearTextOnFocus=false
+local saveWhBtn=Instance.new("TextButton",whCard)
+saveWhBtn.Size=UDim2.new(1,-24,0,32) saveWhBtn.Position=UDim2.new(0,12,0,78)
+saveWhBtn.BackgroundColor3=C.accent saveWhBtn.Text="💾  Simpan Webhook"
+saveWhBtn.TextColor3=C.text saveWhBtn.TextSize=13 saveWhBtn.Font=Enum.Font.GothamBold
+saveWhBtn.BorderSizePixel=0 corner(saveWhBtn,8)
+onTap(saveWhBtn,function()
+    _G.WebhookURL=webhookBox.Text saveConfig()
+    saveWhBtn.Text="✅  Tersimpan!"
+    task.delay(2,function() if saveWhBtn and saveWhBtn.Parent then saveWhBtn.Text="💾  Simpan Webhook" end end)
 end)
-
--- Escape Timing Card
-local escCard = Instance.new("Frame")
-escCard.Parent = pages.Misc
-escCard.Size = UDim2.new(1, -10, 0, 86)
-escCard.Position = UDim2.new(0, 5, 0, 56)
-escCard.BackgroundColor3 = C.card
-escCard.BorderSizePixel = 0
-corner(escCard, 9)
-stroke(escCard, C.border, 1)
-
-local escCardTitle = newLabel(escCard, "⏱  Timing Escape (detik)", 12, C.text, true, Enum.TextXAlignment.Left)
-escCardTitle.Size = UDim2.new(1,-12, 0, 24)
-escCardTitle.Position = UDim2.new(0, 12, 0, 4)
-
-local escSubL = newLabel(escCard, "Default: 270 (= 4.5 menit). Total ronde 5 menit.", 10, C.sub, false, Enum.TextXAlignment.Left)
-escSubL.Size = UDim2.new(1,-24, 0, 14)
-escSubL.Position = UDim2.new(0, 12, 0, 26)
-
-local escInputBg = Instance.new("Frame")
-escInputBg.Parent = escCard
-escInputBg.Size = UDim2.new(0.55, -8, 0, 26)
-escInputBg.Position = UDim2.new(0, 12, 0, 46)
-escInputBg.BackgroundColor3 = C.bg
-escInputBg.BorderSizePixel = 0
-corner(escInputBg, 7)
-stroke(escInputBg, C.border, 1)
-
-local escTimingBox = Instance.new("TextBox")
-escTimingBox.Parent = escInputBg
-escTimingBox.Size = UDim2.new(1,-10, 1, 0)
-escTimingBox.Position = UDim2.new(0, 8, 0, 0)
-escTimingBox.BackgroundTransparency = 1
-escTimingBox.PlaceholderText = "270"
-escTimingBox.Text = tostring(_G.EscapeDelay)
-escTimingBox.TextColor3 = C.text
-escTimingBox.PlaceholderColor3 = C.sub
-escTimingBox.TextSize = 12
-escTimingBox.Font = Enum.Font.GothamBold
-escTimingBox.TextXAlignment = Enum.TextXAlignment.Left
-escTimingBox.ClearTextOnFocus = false
-
-local escSaveBtn = Instance.new("TextButton")
-escSaveBtn.Parent = escCard
-escSaveBtn.Size = UDim2.new(0.45, -8, 0, 26)
-escSaveBtn.Position = UDim2.new(0.55, 4, 0, 46)
-escSaveBtn.BackgroundColor3 = C.accent
-escSaveBtn.Text = "💾 Simpan"
-escSaveBtn.TextColor3 = C.text
-escSaveBtn.TextSize = 11
-escSaveBtn.Font = Enum.Font.GothamBold
-escSaveBtn.BorderSizePixel = 0
-corner(escSaveBtn, 7)
-
-onTap(escSaveBtn, function()
-    local val = tonumber(escTimingBox.Text)
-    if val and val > 0 and val < 300 then
-        _G.EscapeDelay = val
-        saveConfig()
-        escSaveBtn.Text = "✅ Tersimpan!"
-        task.delay(2, function()
-            if escSaveBtn and escSaveBtn.Parent then escSaveBtn.Text = "💾 Simpan" end
-        end)
-    else
-        escSaveBtn.Text = "❌ 1-299 aja"
-        task.delay(2, function()
-            if escSaveBtn and escSaveBtn.Parent then escSaveBtn.Text = "💾 Simpan" end
-        end)
-    end
-end)
-
--- Escape Status Card
-local escStatusCard = Instance.new("Frame")
-escStatusCard.Parent = pages.Misc
-escStatusCard.Size = UDim2.new(1, -10, 0, 70)
-escStatusCard.Position = UDim2.new(0, 5, 0, 150)
-escStatusCard.BackgroundColor3 = C.card
-escStatusCard.BorderSizePixel = 0
-corner(escStatusCard, 9)
-stroke(escStatusCard, C.border, 1)
-
-local escStatusTitle = newLabel(escStatusCard, "🚪  Status Escape", 12, C.text, true, Enum.TextXAlignment.Left)
-escStatusTitle.Size = UDim2.new(1,-12, 0, 24)
-escStatusTitle.Position = UDim2.new(0, 12, 0, 4)
-
--- Dot status
-local escDotDisp = Instance.new("Frame")
-escDotDisp.Parent = escStatusCard
-escDotDisp.Size = UDim2.new(0, 10, 0, 10)
-escDotDisp.Position = UDim2.new(0, 12, 0, 34)
-escDotDisp.BackgroundColor3 = C.red
-escDotDisp.BorderSizePixel = 0
-corner(escDotDisp, 99)
-
--- Label status (Belum Escape / Waktunya Escape!)
-local escStatusLbl = newLabel(escStatusCard, "Belum Escape", 11, C.sub, true, Enum.TextXAlignment.Left)
-escStatusLbl.Size = UDim2.new(0, 120, 0, 16)
-escStatusLbl.Position = UDim2.new(0, 28, 0, 30)
-
--- Hitung mundur timer
-local escTimerDisp = newLabel(escStatusCard, "--:--", 13, C.cyan, true, Enum.TextXAlignment.Right)
-escTimerDisp.Size = UDim2.new(0, 60, 0, 20)
-escTimerDisp.Position = UDim2.new(1, -72, 0, 26)
-
--- status card diupdate dari timer loop utama di bawah
-
--- Webhook Card
-if _G.WebhookURL  == nil then _G.WebhookURL  = "" end
-
-local whCard = Instance.new("Frame")
-whCard.Parent = pages.Misc
-whCard.Size = UDim2.new(1, -10, 0, 192)
-whCard.Position = UDim2.new(0, 5, 0, 228)
-whCard.BackgroundColor3 = C.card
-whCard.BorderSizePixel = 0
-corner(whCard, 9)
-stroke(whCard, C.border, 1)
-
-local whTitleL = newLabel(whCard, "🔔  Webhook Notif", 12, C.text, true, Enum.TextXAlignment.Left)
-whTitleL.Size = UDim2.new(1,-12, 0, 24)
-whTitleL.Position = UDim2.new(0, 12, 0, 6)
-
-local whSubL = newLabel(whCard, "Kirim notif ke Discord webhook URL", 10, C.sub, false, Enum.TextXAlignment.Left)
-whSubL.Size = UDim2.new(1,-24, 0, 14)
-whSubL.Position = UDim2.new(0, 12, 0, 28)
-
-local whInputBg = Instance.new("Frame")
-whInputBg.Parent = whCard
-whInputBg.Size = UDim2.new(1, -24, 0, 26)
-whInputBg.Position = UDim2.new(0, 12, 0, 46)
-whInputBg.BackgroundColor3 = C.bg
-whInputBg.BorderSizePixel = 0
-corner(whInputBg, 7)
-stroke(whInputBg, C.border, 1)
-
-local webhookBox = Instance.new("TextBox")
-webhookBox.Parent = whInputBg
-webhookBox.Size = UDim2.new(1,-10, 1, 0)
-webhookBox.Position = UDim2.new(0, 8, 0, 0)
-webhookBox.BackgroundTransparency = 1
-webhookBox.PlaceholderText = "https://discord.com/api/webhooks/..."
-webhookBox.Text = _G.WebhookURL or ""
-webhookBox.TextColor3 = C.text
-webhookBox.PlaceholderColor3 = C.sub
-webhookBox.TextSize = 10
-webhookBox.Font = Enum.Font.Gotham
-webhookBox.TextXAlignment = Enum.TextXAlignment.Left
-webhookBox.ClearTextOnFocus = false
-
-local evLabel = newLabel(whCard, "Kirim webhook saat:", 10, C.sub, false, Enum.TextXAlignment.Left)
-evLabel.Size = UDim2.new(1,-24, 0, 16)
-evLabel.Position = UDim2.new(0, 12, 0, 78)
-
-local chipsF = Instance.new("Frame")
-chipsF.Parent = whCard
-chipsF.Size = UDim2.new(1, -24, 0, 28)
-chipsF.Position = UDim2.new(0, 12, 0, 96)
-chipsF.BackgroundTransparency = 1
-
-local chipLayout = Instance.new("UIListLayout", chipsF)
-chipLayout.FillDirection = Enum.FillDirection.Horizontal
-chipLayout.Padding = UDim.new(0, 6)
-chipLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-
-local function makeChip(parent, label, acol, initState)
-    local chip = Instance.new("TextButton")
-    chip.Parent = parent
-    chip.Size = UDim2.new(0, 82, 0, 24)
-    chip.BackgroundColor3 = initState and C.accDim or C.bg
-    chip.Text = (initState and "✓ " or "") .. label
-    chip.TextColor3 = initState and acol or C.sub
-    chip.TextSize = 10
-    chip.Font = Enum.Font.GothamBold
-    chip.BorderSizePixel = 0
-    corner(chip, 20)
-    stroke(chip, initState and acol or C.border, 1)
-    local state = initState or false
-    onTap(chip, function()
-        state = not state
-        chip.BackgroundColor3 = state and C.accDim or C.bg
-        chip.TextColor3 = state and acol or C.sub
-        chip.Text = (state and "✓ " or "") .. label
-        for _, ch in ipairs(chip:GetChildren()) do
-            if ch:IsA("UIStroke") then ch:Destroy() end
-        end
-        stroke(chip, state and acol or C.border, 1)
+local chipsF=Instance.new("Frame",whCard)
+chipsF.Size=UDim2.new(1,-24,0,30) chipsF.Position=UDim2.new(0,12,0,118)
+chipsF.BackgroundTransparency=1
+local chipLayout=Instance.new("UIListLayout",chipsF)
+chipLayout.FillDirection=Enum.FillDirection.Horizontal chipLayout.Padding=UDim.new(0,8)
+local function makeChip(par,label,acol,initState)
+    local chip=Instance.new("TextButton",par)
+    chip.Size=UDim2.new(0,90,0,28) chip.BackgroundColor3=initState and C.accDim or C.bg
+    chip.Text=(initState and "✓ " or "")..label chip.TextColor3=initState and acol or C.sub
+    chip.TextSize=11 chip.Font=Enum.Font.GothamBold chip.BorderSizePixel=0
+    corner(chip,20) stroke(chip,initState and acol or C.border,1)
+    local state=initState or false
+    onTap(chip,function()
+        state=not state
+        chip.BackgroundColor3=state and C.accDim or C.bg chip.TextColor3=state and acol or C.sub
+        chip.Text=(state and "✓ " or "")..label
+        for _,ch in ipairs(chip:GetChildren()) do if ch:IsA("UIStroke") then ch:Destroy() end end
+        stroke(chip,state and acol or C.border,1)
     end)
-    local function getState() return state end
-    return chip, getState
+    return chip,function() return state end
 end
-
-local evLootChip, getEvLoot   = makeChip(chipsF, "Per Loot",  C.green,  _G.WhEv_Loot)
-local evBatchChip, getEvBatch = makeChip(chipsF, "Per Batch", C.yellow, _G.WhEv_Batch)
-local evTimerChip, getEvTimer = makeChip(chipsF, "Timer 5m",  C.cyan,   _G.WhEv_Timer)
-
-onTap(evLootChip, function() _G.WhEv_Loot  = getEvLoot()  saveConfig() end)
-onTap(evBatchChip, function() _G.WhEv_Batch = getEvBatch() saveConfig() end)
-onTap(evTimerChip, function() _G.WhEv_Timer = getEvTimer() saveConfig() end)
-
-local saveWhBtn = Instance.new("TextButton")
-saveWhBtn.Parent = whCard
-saveWhBtn.Size = UDim2.new(1, -24, 0, 28)
-saveWhBtn.Position = UDim2.new(0, 12, 0, 132)
-saveWhBtn.BackgroundColor3 = C.accent
-saveWhBtn.Text = "💾  Simpan Webhook"
-saveWhBtn.TextColor3 = C.text
-saveWhBtn.TextSize = 12
-saveWhBtn.Font = Enum.Font.GothamBold
-saveWhBtn.BorderSizePixel = 0
-corner(saveWhBtn, 8)
-
-onTap(saveWhBtn, function()
-    _G.WebhookURL = webhookBox.Text
-    saveConfig()
-    saveWhBtn.Text = "✅  Tersimpan!"
-    task.delay(2, function()
-        if saveWhBtn and saveWhBtn.Parent then saveWhBtn.Text = "💾  Simpan Webhook" end
-    end)
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(300)
-        if _G.WhEv_Timer and _G.WebhookURL and _G.WebhookURL ~= "" then
-            pcall(function()
-                game:GetService("HttpService"):PostAsync(
-                    _G.WebhookURL,
-                    game:GetService("HttpService"):JSONEncode({
-                        content = "⏱ **5 menit update** | Total loot: "..totalCollected.." | Farm: "..(running and "ON" or "OFF")
-                    }),
-                    Enum.HttpContentType.ApplicationJson
-                )
-            end)
-        end
-    end
-end)
+local evLootChip,getEvLoot=makeChip(chipsF,"Per Loot",C.green,_G.WhEv_Loot)
+local evBatchChip,getEvBatch=makeChip(chipsF,"Per Batch",C.yellow,_G.WhEv_Batch)
+onTap(evLootChip,function() _G.WhEv_Loot=getEvLoot() saveConfig() end)
+onTap(evBatchChip,function() _G.WhEv_Batch=getEvBatch() saveConfig() end)
 
 -- ══════════════════════════════════════════════
 --  TAB NAVIGATION
 -- ══════════════════════════════════════════════
 local function switchTab(name)
-    for id, ni in pairs(navItems) do
-        local on = id == name
-        ni.btn.BackgroundColor3 = on and C.accDim or Color3.new(0,0,0)
-        ni.btn.BackgroundTransparency = on and 0 or 1
-        ni.indBar.Visible = on
-        ni.labelL.TextColor3 = on and C.text or C.sub
-        ni.symL.TextColor3   = on and C.accent or C.accent
-        if on then
-            stroke(ni.btn, C.border, 1)
-        else
-            for _, ch in ipairs(ni.btn:GetChildren()) do
-                if ch:IsA("UIStroke") then ch:Destroy() end
-            end
-        end
+    for id,ni in pairs(navItems) do
+        local on=id==name
+        ni.btn.BackgroundColor3=on and C.accDim or Color3.new(0,0,0)
+        ni.btn.BackgroundTransparency=on and 0 or 1
+        ni.bar.Visible=on ni.labL.TextColor3=on and C.text or C.sub
+        if on then stroke(ni.btn,C.border,1)
+        else for _,ch in ipairs(ni.btn:GetChildren()) do if ch:IsA("UIStroke") then ch:Destroy() end end end
     end
-    for n, page in pairs(pages) do
-        -- geser ke dalam layar kalau aktif, ke luar kalau tidak
-        page.Position = (n == name)
-            and UDim2.new(0, 0, 0, 0)
-            or  UDim2.new(10, 0, 0, 0)
+    for n,page in pairs(pages) do
+        page.Position=(n==name) and UDim2.new(0,0,0,0) or UDim2.new(10,0,0,0)
     end
-    local info = TAB_INFO[name]
-    if info then
-        panelTitle.Text = info.title
-        panelSub.Text   = info.sub
-    end
-    pageScroll.CanvasPosition = Vector2.new(0, 0)
+    local info=TAB_INFO[name]
+    if info then panelTitle.Text=info.title panelSub.Text=info.sub end
+    scroll.CanvasPosition=Vector2.new(0,0)
 end
-
-for id, ni in pairs(navItems) do
-    onTap(ni.btn, function() switchTab(id) end)
-end
--- switchTab dipanggil di akhir setelah semua pages selesai dibuat
+for id,ni in pairs(navItems) do onTap(ni.btn,function() switchTab(id) end) end
 
 -- ══════════════════════════════════════════════
 --  STATUS HELPERS
 -- ══════════════════════════════════════════════
-setStatus = function(text, active)
-    statusLbl.Text        = text
-    sDot.BackgroundColor3 = active and C.green or C.red
-    statusLbl.TextColor3  = active and C.green or C.sub
-    tbDotF.BackgroundColor3 = active and C.green or C.red
-    tbDotTxt.Text           = active and "ON"    or "Idle"
-    tbDotTxt.TextColor3     = active and C.green or C.sub
-    sbDot.BackgroundColor3  = active and C.green or C.red
-    sbTxt.Text              = active and "Farming" or "Idle"
-    sbTxt.TextColor3        = active and C.green or C.sub
+setStatus=function(text,active)
+    statusLbl.Text=text
+    local col=active and C.green or C.red
+    sDot.BackgroundColor3=col statusLbl.TextColor3=active and C.green or C.sub
+    tbDot.BackgroundColor3=col tbTxt.Text=active and "ON" or "Idle"
+    tbTxt.TextColor3=active and C.green or C.sub
+    sbDot2.BackgroundColor3=col sbTxt.Text=active and "Running" or "Idle"
+    sbTxt.TextColor3=active and C.green or C.sub
 end
-
-updateStats = function(col, found)
-    s1val.Text = tostring(col)
-    s2val.Text = tostring(found or 0)
-end
-
-GUIPrint = function(text, color)
-    -- log dinonaktifkan
+updateStats=function(col,found)
+    s1val.Text=tostring(col) s2val.Text=tostring(found or 0)
 end
 
 -- ══════════════════════════════════════════════
---  FARM LOGIC
+--  ██████████████████████████████████████████
+--       SISTEM MANDOR — PRIORITY CONTROLLER
+--  ██████████████████████████████████████████
 -- ══════════════════════════════════════════════
-local function getLootObjects()
-    local results, seen = {}, {}
-    local myY = hrp and hrp.Position.Y or 0
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if isLootModel(obj) then
-            -- cek loot belum diambil: billboard masih ada
-            local hasBillboard = false
-            pcall(function()
-                for _, d in ipairs(obj:GetDescendants()) do
-                    if d.Name == "LootCoinBillboard" then
-                        hasBillboard = true
-                        break
-                    end
-                end
-            end)
-            if not hasBillboard then continue end
 
-            local pos
-            if obj.PrimaryPart then
-                pos = obj.PrimaryPart.Position
-            else
-                local ok, cf = pcall(function() return obj:GetModelCFrame() end)
-                if ok then pos = cf.Position end
-            end
-            if pos and math.abs(pos.Y - myY) < 150 then
-                local key = math.floor(pos.X)..math.floor(pos.Y)..math.floor(pos.Z)
-                if not seen[key] then
-                    seen[key] = true
-                    table.insert(results, {name = obj.Name, pos = pos})
-                end
-            end
-        end
-    end
-    -- shuffle biar pattern random tiap round
-    for i = #results, 2, -1 do
-        local j = math.random(1, i)
-        results[i], results[j] = results[j], results[i]
-    end
-    return results
-end
-
-local KILLER_SAFE_RADIUS = 20
-
-local function getKillerPositions()
-    local positions = {}
-    for _, obj in ipairs(workspace:GetDescendants()) do
+-- ── KILLER CACHE (satu mata-mata, semua baca di sini) ──
+local KillerCache = {
+    positions  = {},
+    lastUpdate = 0,
+    INTERVAL   = 0.2,
+}
+local function refreshKillerCache()
+    if (tick()-KillerCache.lastUpdate) < KillerCache.INTERVAL then return end
+    KillerCache.lastUpdate = tick()
+    KillerCache.positions  = {}
+    for _,obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
-            local name = obj.Name:lower()
-            if name:find("killer") or name:find("monster") or name:find("enemy") then
-                local root = obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
-                if root then table.insert(positions, root.Position) end
+            local n=obj.Name:lower()
+            if n:find("killer") or n:find("monster") or n:find("enemy") then
+                local root=obj:FindFirstChild("HumanoidRootPart") or obj.PrimaryPart
+                if root then table.insert(KillerCache.positions,root.Position) end
             end
         end
     end
-    return positions
 end
 
-local function isNearKiller()
-    if not hrp then return false end
-    for _, kpos in ipairs(getKillerPositions()) do
-        if (hrp.Position - kpos).Magnitude <= KILLER_SAFE_RADIUS then
-            return true, kpos
-        end
+local function isNearKillerCached(pos,radius)
+    for _,kpos in ipairs(KillerCache.positions) do
+        if (pos-kpos).Magnitude <= radius then return true,kpos end
     end
-    return false, nil
+    return false,nil
 end
 
-local function teleportAwayFromKiller(killerPos)
-    if not hrp then return end
-    local myPos = hrp.Position
-    local awayDir = (myPos - killerPos).Unit
-    local randAngle = math.rad(math.random(-45, 45))
-    local rotated = Vector3.new(
-        awayDir.X * math.cos(randAngle) - awayDir.Z * math.sin(randAngle),
-        0,
-        awayDir.X * math.sin(randAngle) + awayDir.Z * math.cos(randAngle)
-    )
-    local dist = math.random(40, 80)
-    local targetPos = myPos + rotated * dist + Vector3.new(0, 3, 0)
-    hrp.CFrame = CFrame.new(targetPos)
-    GUIPrint("🛡️ Killer Safe! TP jauh "..math.floor(dist).." studs", C.red)
-end
+-- ── INTENT TABLE ──
+-- Setiap fitur nulis targetPos & label ke sini, TIDAK teleport sendiri
+local Intent = {
+    -- priority 1 (paling darurat)
+    selfRevive = { active=false, targetPos=nil, label="Self Revive" },
+    -- priority 2
+    escape     = { active=false, targetPos=nil, label="Escape" },
+    -- priority 3
+    revive     = { active=false, targetPos=nil, label="Revive" },
+    -- priority 4 (terendah)
+    farm       = { active=false, targetPos=nil, label="Farm" },
+}
 
-local MAX_BATCH = 50
-local CD_SECS   = 2
+-- urutan prioritas dari tertinggi ke terendah
+local PRIORITY_ORDER = {"selfRevive","escape","revive","farm"}
 
-local function farmLoop()
-    while running do
-        char = player.Character
-        if not char then
-            setStatus("⏳ Nunggu karakter...", true)
-            task.wait(1)
-        else
-            hrp = char:FindFirstChild("HumanoidRootPart")
-            hum = char:FindFirstChild("Humanoid")
-            if not hrp or not hum then
-                setStatus("⏳ Nunggu karakter...", true)
-                task.wait(1)
-            elseif hum.Health <= 0 then
-                setStatus("💀 Mati, nunggu respawn...", true)
-                local newChar = player.CharacterAdded:Wait()
-                char = newChar
-                hrp  = newChar:WaitForChild("HumanoidRootPart")
-                hum  = newChar:WaitForChild("Humanoid")
-                task.wait(2)
-            else
-                local all   = getLootObjects()
-                local batch = {}
-                for i = 1, math.min(MAX_BATCH, #all) do batch[i] = all[i] end
-                updateStats(totalCollected, #batch)
+-- ── SHARED STATE ──
+local totalCollected = 0
+local masterRunning  = false
+local lastTimerSecs  = nil
+local hasEscaped     = false
+local validTimerTick = 0
+local escapeGuard    = false -- lagi proses escape, jangan teleport lain
+local isReviving     = false -- flag: lagi proses revive, aktifkan auto flee realtime
 
-                if #batch == 0 then
-                    -- semua loot habis, tunggu respawn
-                    setStatus("⌛ Loot habis, nunggu respawn...", true)
-                    while running do
-                        task.wait(3)
-                        local check = getLootObjects()
-                        if #check > 0 then
-                            GUIPrint("🔄 Loot respawn! Lanjut farm", C.green)
-                            break
-                        end
-                    end
-                else
-                    for i, loot in ipairs(batch) do
-                        if not running then break end
-                        char = player.Character
-                        if not char then break end
-                        hrp = char:FindFirstChild("HumanoidRootPart")
-                        hum = char:FindFirstChild("Humanoid")
-                        if not hrp or not hum then break end
-                        if hum.Health <= 0 then break end
-
-                        if getKillerSafeCb() then
-                            local tooClose = false
-                            for _, kpos in ipairs(getKillerPositions()) do
-                                if (loot.pos - kpos).Magnitude <= KILLER_SAFE_RADIUS then
-                                    tooClose = true
-                                    break
-                                end
-                            end
-                            local nearKiller, kpos = isNearKiller()
-                            if nearKiller then
-                                teleportAwayFromKiller(kpos)
-                                task.wait(0.5)
-                                break
-                            end
-                            if tooClose then task.wait(0.3); continue end
-                        end
-
-                        setStatus("🔄 "..i.."/"..#batch.." — "..loot.name, true)
-                        hrp.CFrame = CFrame.new(loot.pos + Vector3.new(0, 3, 0))
-
-                        if getKillerSafeCb() then
-                            task.wait(0.05)
-                            local nearKiller, kpos = isNearKiller()
-                            if nearKiller then
-                                teleportAwayFromKiller(kpos)
-                                task.wait(0.5)
-                                break
-                            end
-                        end
-
-                        totalCollected = totalCollected + 1
-                        updateStats(totalCollected, #batch - i)
-                        GUIPrint("✅ "..loot.name, C.green)
-
-                        if _G.WhEv_Loot and _G.WebhookURL and _G.WebhookURL ~= "" then
-                            pcall(function()
-                                game:GetService("HttpService"):PostAsync(
-                                    _G.WebhookURL,
-                                    game:GetService("HttpService"):JSONEncode({
-                                        content = "✅ **Loot collected:** `"..loot.name.."` | Total: "..totalCollected
-                                    }),
-                                    Enum.HttpContentType.ApplicationJson
-                                )
-                            end)
-                        end
-                        -- jeda random biar pattern susah ketebak
-                        task.wait(math.random(2, 5) * 0.1)
-                    end
-
-                    if not running then break end
-
-                    if _G.WhEv_Batch and _G.WebhookURL and _G.WebhookURL ~= "" then
-                        pcall(function()
-                            game:GetService("HttpService"):PostAsync(
-                                _G.WebhookURL,
-                                game:GetService("HttpService"):JSONEncode({
-                                    content = "📦 **Batch selesai!** Total: "..totalCollected
-                                }),
-                                Enum.HttpContentType.ApplicationJson
-                            )
-                        end)
-                    end
-
-                    for t = CD_SECS, 1, -1 do
-                        if not running then break end
-                        setStatus("⏳ Cooldown "..t.."s", true)
-                        task.wait(1)
-                    end
-                end
-            end
-        end
-    end
-    setStatus("Idle — menunggu", false)
-end
-
-onTap(farmTgl, function()
-    local newVal = not getFarmCb()
-    setFarmCb(newVal)
-    running = newVal
-    _G.FarmRunning = newVal
-    if newVal then
-        GUIPrint("▶ Farm aktif!", C.green)
-        task.spawn(farmLoop)
-    else
-        GUIPrint("⏹ Farm dimatikan. Total: "..totalCollected, C.red)
-        setStatus("Idle — menunggu", false)
-    end
-    saveConfig()
-end)
-
-onTap(killerSafeTgl, function()
-    local val = not getKillerSafeCb()
-    setKillerSafeCb(val)
-    _G.KillerSafeOn = val
-    GUIPrint(val and "🛡️ Killer Safe ON" or "🛡️ Killer Safe OFF", val and C.red or C.sub)
-    saveConfig()
-end)
-
-if _G.KillerSafeOn then setKillerSafeCb(true) end
-
-
--- timer kotak ke-3
+-- ── TIMER READER ──
 local function getDigitSTK(folder)
-    local best = {val = 0, dist = math.huge}
-    for _, v in pairs(folder:GetChildren()) do
+    local best={val=0,dist=math.huge}
+    for _,v in pairs(folder:GetChildren()) do
         if v:IsA("TextLabel") then
-            local centerY = folder.AbsolutePosition.Y + folder.AbsoluteSize.Y / 2
-            local dist = math.abs(v.AbsolutePosition.Y - centerY)
-            if dist < best.dist then
-                best.dist = dist
-                best.val = tonumber(v.Text) or 0
-            end
+            local cy=folder.AbsolutePosition.Y+folder.AbsoluteSize.Y/2
+            local d=math.abs(v.AbsolutePosition.Y-cy)
+            if d<best.dist then best.dist=d best.val=tonumber(v.Text) or 0 end
         end
     end
     return best.val
 end
-
--- ══════════════════════════════════════════════
---  AUTO ESCAPE LOGIC (Timer-Based)
---  Teleport ke ExitDoor saat timer ingame <= 59s
--- ══════════════════════════════════════════════
-local ESCAPE_SAFE_RADIUS = 40
-local ESCAPE_BAIT_LIMIT  = 5
-local ESCAPE_RECHECK_CD  = 2
-local ESCAPE_RETRY_WAIT  = 3
-
-local function isKillerNearPos(pos, radius)
-    for _, kpos in ipairs(getKillerPositions()) do
-        if (pos - kpos).Magnitude <= radius then return true end
-    end
-    return false
+local function getRoundTimerSecs()
+    local sisa=nil
+    pcall(function()
+        local t=player.PlayerGui.TopBar.RoundTimer
+        local m1=getDigitSTK(t.Minute1.InnerBox.Numbers)
+        local m2=getDigitSTK(t.Minute2.InnerBox.Numbers)
+        local s1=getDigitSTK(t.Second1.InnerBox.Numbers)
+        local s2=getDigitSTK(t.Second2.InnerBox.Numbers)
+        sisa=(m1*10+m2)*60+(s1*10+s2)
+    end)
+    return sisa
 end
 
+-- ── EXIT DOOR FINDER ──
 local function getExitDoorPos()
-    -- Method 1: path spesifik STK (paling reliable)
-    local ok1, pos1 = pcall(function()
-        return workspace.CurrentMap.ExitDoor.Glow.CFrame.Position
-    end)
-    if ok1 and pos1 then return pos1 end
-
-    -- Method 2: FindFirstChild ExitDoor di CurrentMap
-    local ok2, cm = pcall(function() return workspace.CurrentMap end)
-    if ok2 and cm then
-        local door = cm:FindFirstChild("ExitDoor", true)
-        if door then
-            if door:IsA("BasePart") then return door.Position end
-            local ok3, cf = pcall(function() return door:GetModelCFrame() end)
-            if ok3 then return cf.Position end
-        end
-    end
-
-    -- Method 3: fallback scan Exits folder → ExitGateway
-    for _, folder in ipairs(workspace:GetDescendants()) do
-        if folder.Name == "Exits" and folder:IsA("Folder") then
-            for _, child in ipairs(folder:GetChildren()) do
-                if child.Name == "ExitGateway" and child:IsA("Model") then
-                    if child.PrimaryPart then return child.PrimaryPart.Position end
-                    local ok4, cf = pcall(function() return child:GetModelCFrame() end)
-                    if ok4 then return cf.Position end
+    for _,folder in ipairs(workspace:GetChildren()) do
+        if folder:IsA("Folder") or folder:IsA("Model") then
+            local exits=folder:FindFirstChild("Exits")
+            if exits then
+                local gw=exits:FindFirstChild("ExitGateway")
+                if gw then
+                    local dw=gw:FindFirstChild("Doorway")
+                    if dw then
+                        local dest=dw:FindFirstChild("Door1Destination")
+                        if dest and dest:IsA("BasePart") then return dest.Position end
+                    end
                 end
             end
         end
     end
-
     return nil
 end
 
-local escapeRunning  = false
-local escapeSuccess  = false  -- flag shared ke display card
-
-local function getRoundTimerSeconds()
-    local ok, sisa = pcall(function()
-        local t = player.PlayerGui.TopBar.RoundTimer
-        local m1 = getDigitSTK(t.Minute1.InnerBox.Numbers)
-        local m2 = getDigitSTK(t.Minute2.InnerBox.Numbers)
-        local s1 = getDigitSTK(t.Second1.InnerBox.Numbers)
-        local s2 = getDigitSTK(t.Second2.InnerBox.Numbers)
-        return (m1*10+m2)*60 + (s1*10+s2)
-    end)
-    if ok then return sisa end
-    return nil
+-- ── LOOT SCANNER ──
+local function isLootModel(obj)
+    if not obj:IsA("Model") then return false end
+    local p=obj.Parent if not p then return false end
+    return p.Name:match("^%d+$") ~= nil
 end
-
-local function escapeLoop()
-    local hasEscaped      = false
-    local lastDecision    = 0
-    local killerBaitTimer = {}
-
-    -- Tunggu TopBar load dulu
-    repeat task.wait(1) until (not escapeRunning) or pcall(function()
-        return player.PlayerGui.TopBar.RoundTimer
-    end)
-
-    GUIPrint("🚪 Auto Escape aktif, nunggu timer ≤ 59s...", C.cyan)
-
-    while escapeRunning do
-        task.wait(0.5)
-
-        char = player.Character
-        if not char then task.wait(1); continue end
-        hrp = char:FindFirstChild("HumanoidRootPart")
-        hum = char:FindFirstChild("Humanoid")
-        if not hrp or not hum or hum.Health <= 0 then
-            task.wait(1); continue
-        end
-
-        if hasEscaped then
-            setStatus("✅ Escaped — tunggu round baru", false)
-            continue
-        end
-
-        local sisa = getRoundTimerSeconds()
-        if not sisa or sisa <= 0 then
-            setStatus("🏠 Lobby / timer ga kebaca", false)
-            task.wait(1); continue
-        end
-
-        -- Belum waktunya escape
-        if sisa > 59 then
-            local countdown = sisa - 59
-            setStatus("🚪 Escape in "..countdown.."s", true)
-            continue
-        end
-
-        -- Cooldown keputusan (anti spam teleport)
-        local now = tick()
-        if now - lastDecision < ESCAPE_RECHECK_CD then continue end
-        lastDecision = now
-
-        -- Cari exit
-        local exitPos = getExitDoorPos()
-        if not exitPos then
-            setStatus("⚠️ Pintu exit ga ketemu!", true)
-            continue
-        end
-
-        -- Cek killer deket exit
-        if isKillerNearPos(exitPos, ESCAPE_SAFE_RADIUS) then
-            local eKey = math.floor(exitPos.X)..","..math.floor(exitPos.Z)
-            if not killerBaitTimer[eKey] then
-                killerBaitTimer[eKey] = tick()
-            end
-            local waitDur = tick() - (killerBaitTimer[eKey] or tick())
-            if waitDur > ESCAPE_BAIT_LIMIT then
-                GUIPrint("⚠️ Killer bait "..math.floor(waitDur).."s, nekat escape!", C.red)
+local function getLootObjects()
+    local results,seen={},{}
+    local myY=hrp and hrp.Position.Y or 0
+    for _,obj in ipairs(workspace:GetDescendants()) do
+        if isLootModel(obj) then
+            local pos
+            if obj.PrimaryPart then pos=obj.PrimaryPart.Position
             else
-                setStatus("⚠️ Killer di exit, nunggu...", true)
-                task.wait(ESCAPE_RETRY_WAIT)
-                continue
+                local ok,cf=pcall(function() return obj:GetModelCFrame() end)
+                if ok then pos=cf.Position end
             end
-        else
-            killerBaitTimer = {}
-        end
-
-        -- Double cek timer masih <= 59
-        sisa = getRoundTimerSeconds()
-        if not sisa or sisa > 59 then continue end
-
-        -- TELEPORT!
-        local dist = math.floor((exitPos - hrp.Position).Magnitude)
-        setStatus("🏃 Teleport ke exit! ("..dist.." studs)", true)
-        GUIPrint("🏃 Escape! Timer "..sisa.."s | "..dist.." studs", C.cyan)
-        hrp.CFrame = CFrame.new(exitPos + Vector3.new(0, 3, 0))
-        hasEscaped   = true
-        escapeSuccess = true  -- update display card
-        killerBaitTimer = {}
-        GUIPrint("✅ Escaped! Tunggu round baru...", C.green)
-        setStatus("✅ Escaped!", false)
-
-        -- Tunggu round selesai (timer = 0 atau lobby)
-        while escapeRunning do
-            task.wait(1)
-            local s = getRoundTimerSeconds()
-            if not s or s == 0 then break end
-        end
-
-        -- Reset untuk round baru
-        hasEscaped    = false
-        escapeSuccess = false
-        killerBaitTimer = {}
-        GUIPrint("⏱️ Round baru, siap escape lagi!", C.accent)
-
-        -- Tunggu timer muncul lagi > 59s (round baru beneran mulai)
-        while escapeRunning do
-            task.wait(1)
-            local s = getRoundTimerSeconds()
-            if s and s > 59 then break end
+            if pos and math.abs(pos.Y-myY)<150 then
+                local key=math.floor(pos.X)..math.floor(pos.Y)..math.floor(pos.Z)
+                if not seen[key] then
+                    seen[key]=true table.insert(results,{name=obj.Name,pos=pos})
+                end
+            end
         end
     end
-
-    escapeSuccess = false
-    setStatus("Idle — menunggu", false)
-end
-
-onTap(escapeTgl, function()
-    local val = not getEscapeCb()
-    setEscapeCb(val)
-    escapeRunning = val
-    _G.EscapeRunning = val
-    if val then
-        task.spawn(escapeLoop)
-        GUIPrint("🚪 Auto Escape ON — nunggu 00:59", C.cyan)
-    else
-        GUIPrint("🚪 Auto Escape OFF", C.sub)
+    for i=#results,2,-1 do
+        local j=math.random(1,i) results[i],results[j]=results[j],results[i]
     end
-    saveConfig()
-end)
-
-if _G.EscapeRunning then
-    escapeRunning = true
-    setEscapeCb(true)
-    task.spawn(escapeLoop)
+    return results
 end
 
--- ══════════════════════════════════════════════
---  AUTO KILL LOGIC
--- ══════════════════════════════════════════════
+-- ── PLAYER ROLE HELPERS ──
 local function isPlayerKiller(p)
-    -- Cek via Team
-    if p.Team then
-        local tn = p.Team.Name:lower()
-        if tn:find("killer") or tn:find("monster") or tn:find("enemy") then return true end
-    end
-    -- Cek via Attribute
-    if p:GetAttribute("IsKiller") == true then return true end
+    if p.Team then local tn=p.Team.Name:lower() if tn:find("killer") or tn:find("monster") then return true end end
+    if p:GetAttribute("IsKiller")==true then return true end
     if p:GetAttribute("Role") then
-        local r = tostring(p:GetAttribute("Role")):lower()
+        local r=tostring(p:GetAttribute("Role")):lower()
         if r:find("killer") or r:find("monster") then return true end
     end
-    -- Cek via nama karakter
-    local pChar = p.Character
-    if pChar then
-        local cname = pChar.Name:lower()
-        if cname:find("killer") or cname:find("monster") or cname:find("enemy") then return true end
-        -- Cek KillerGui di PlayerGui target (kalau bisa diakses)
-        local ok, kg = pcall(function()
-            return p.PlayerGui:FindFirstChild("KillerGui", true)
-                or p.PlayerGui:FindFirstChild("KillerHUD", true)
-                or p.PlayerGui:FindFirstChild("MonsterGui", true)
-        end)
-        if ok and kg and kg.Enabled then return true end
-    end
+    local pc=p.Character
+    if pc then if pc.Name:lower():find("killer") or pc.Name:lower():find("monster") then return true end end
     return false
 end
-
-local function getAlivePlayers()
-    local list = {}
-    for _, p in ipairs(game.Players:GetPlayers()) do
-        if p ~= player and not isPlayerKiller(p) then
-            local pChar = p.Character
-            if pChar then
-                local pHum = pChar:FindFirstChild("Humanoid")
-                local pHrp = pChar:FindFirstChild("HumanoidRootPart")
-                if pHum and pHrp and pHum.Health > 0 then
-                    table.insert(list, { plr = p, pHrp = pHrp })
-                end
-            end
-        end
-    end
-    return list
-end
-
--- Cek apakah player lagi jadi killer berdasarkan tag/team/nilai di game
 local function isKillerRole()
-    -- Cek via Team (biasanya killer punya team berbeda)
-    if player.Team then
-        local teamName = player.Team.Name:lower()
-        if teamName:find("killer") or teamName:find("monster") or teamName:find("enemy") then
-            return true
-        end
-    end
-    -- Cek via attribute/tag di karakter atau player
-    if player:GetAttribute("IsKiller") == true then return true end
-    if player:GetAttribute("Role") then
-        local role = tostring(player:GetAttribute("Role")):lower()
-        if role:find("killer") or role:find("monster") then return true end
-    end
-    -- Cek via karakter: kalau nama karakter lo ada di daftar killer workspace
-    char = player.Character
-    if char then
-        for _, obj in ipairs(workspace:GetDescendants()) do
-            if obj:IsA("Model") and obj == char then
-                local name = obj.Name:lower()
-                if name:find("killer") or name:find("monster") then return true end
-            end
-        end
-    end
-    -- Cek via PlayerGui: biasanya ada UI khusus killer
-    local ok, killerGui = pcall(function()
-        return player.PlayerGui:FindFirstChild("KillerGui", true)
-            or player.PlayerGui:FindFirstChild("KillerHUD", true)
-            or player.PlayerGui:FindFirstChild("MonsterGui", true)
-    end)
-    if ok and killerGui and killerGui.Enabled then return true end
+    if player.Team then local tn=player.Team.Name:lower() if tn:find("killer") or tn:find("monster") then return true end end
+    if player:GetAttribute("IsKiller")==true then return true end
     return false
 end
 
-local function killLoop()
-    while killRunning do
-        task.wait(0.5)
-        char = player.Character
-        if not char then task.wait(1); continue end
-        hrp = char:FindFirstChild("HumanoidRootPart")
-        hum = char:FindFirstChild("Humanoid")
-        if not hrp or not hum or hum.Health <= 0 then task.wait(1); continue end
-
-        -- Hanya aktif saat lo jadi killer, bukan survivor
-        if not isKillerRole() then
-            task.wait(1)
-            continue
-        end
-
-        local targets = getAlivePlayers()
-        if #targets == 0 then task.wait(2); continue end
-
-        -- Tarik semua player ke depan lo secara sejajar (bukan numpuk)
-        -- Susun dalam baris horizontal tegak lurus arah hadap lo
-        local myLook = hrp.CFrame.LookVector
-        -- Semua numpuk di satu titik persis depan killer
-        local stackPos = hrp.Position + myLook * 1.5 + Vector3.new(0, 0.5, 0)
-
-        for _, t in ipairs(targets) do
-            pcall(function()
-                t.pHrp.CFrame = CFrame.new(stackPos, stackPos + myLook)
-            end)
-        end
-
-        task.wait(0.3)
-    end
-end
-
-onTap(killTgl, function()
-    local val = not getKillCb()
-    setKillCb(val)
-    killRunning = val
-    _G.KillRunning = val
-    if val then task.spawn(killLoop)
-    else GUIPrint("🗡️ Auto Kill OFF", C.sub) end
-    saveConfig()
-end)
-
-if _G.KillRunning then
-    killRunning = true
-    setKillCb(true)
-    task.spawn(killLoop)
-end
-
--- ══════════════════════════════════════════════
---  AUTO SELF-REVIVE
--- ══════════════════════════════════════════════
--- ══════════════════════════════════════════════
---  SMART REVIVE / SELF-REVIVE CONSTANTS (harus di atas semua fungsi yang pakai)
--- ══════════════════════════════════════════════
-local REVIVE_SAFE_RADIUS  = 35   -- studs — killer harus lebih jauh dari ini ke target
-local REVIVE_DECISION_CD  = 3    -- detik — cooldown keputusan (anti flip-flop)
-local REVIVE_BAIT_LIMIT   = 5    -- detik — kalau killer stay deket target > ini, skip target itu
-local REVIVE_WAIT_DANGER  = 2    -- detik — tunggu saat kondisi bahaya sebelum cek ulang
-local SELF_REVIVE_SAFE_RADIUS = 25  -- studs, radius killer check untuk self-revive
-
+-- ── SELF KNOCKED DETECTOR ──
 local function isSelfKnocked()
-    char = player.Character
-    if not char then return false end
-
-    -- Cek 1: Humanoid health = 0
-    local myHum = char:FindFirstChild("Humanoid")
-    if myHum and myHum.Health <= 0 then return true end
-
-    -- Cek 2: BleedOutHealth di HumanoidRootPart
-    local myHrp = char:FindFirstChild("HumanoidRootPart")
+    char=player.Character if not char then return false end
+    local myHum=char:FindFirstChild("Humanoid")
+    if myHum and myHum.Health<=0 then return true end
+    local myHrp=char:FindFirstChild("HumanoidRootPart")
     if myHrp then
-        local bleed = myHrp:FindFirstChild("BleedOutHealth")
+        local bleed=myHrp:FindFirstChild("BleedOutHealth")
         if bleed then
             if (bleed:IsA("BillboardGui") or bleed:IsA("ScreenGui") or bleed:IsA("Frame")) and bleed.Enabled then return true end
             if bleed:IsA("BoolValue") and bleed.Value then return true end
         end
     end
-
-    -- Cek 3: BleedOutHealth di seluruh char (recursive)
-    local bleed2 = char:FindFirstChild("BleedOutHealth", true)
+    local bleed2=char:FindFirstChild("BleedOutHealth",true)
     if bleed2 then
         if (bleed2:IsA("BillboardGui") or bleed2:IsA("ScreenGui")) and bleed2.Enabled then return true end
         if bleed2:IsA("BoolValue") and bleed2.Value then return true end
     end
-
-    -- Cek 4: GUI knocked di PlayerGui (BleedOutGui / BleedOut / KnockedGui)
-    local ok, bleedGui = pcall(function()
-        return player.PlayerGui:FindFirstChild("BleedOutGui", true)
-            or player.PlayerGui:FindFirstChild("BleedOut", true)
-            or player.PlayerGui:FindFirstChild("KnockedGui", true)
+    local ok,bleedGui=pcall(function()
+        return player.PlayerGui:FindFirstChild("BleedOutGui",true)
+            or player.PlayerGui:FindFirstChild("BleedOut",true)
+            or player.PlayerGui:FindFirstChild("KnockedGui",true)
     end)
     if ok and bleedGui and bleedGui.Enabled then return true end
-
-    -- Cek 5: Attribute "Knocked" atau "IsKnocked" di player/char
-    if player:GetAttribute("Knocked") == true then return true end
-    if player:GetAttribute("IsKnocked") == true then return true end
-    if char:GetAttribute("Knocked") == true then return true end
-
-    -- Cek 6: Humanoid StateType = Dead atau Physics (knocked biasanya Physics)
-    if myHum then
-        local state = myHum:GetState()
-        if state == Enum.HumanoidStateType.Dead then return true end
-    end
-
+    if player:GetAttribute("Knocked")==true then return true end
+    if player:GetAttribute("IsKnocked")==true then return true end
+    if char:GetAttribute("Knocked")==true then return true end
+    if myHum and myHum:GetState()==Enum.HumanoidStateType.Dead then return true end
     return false
 end
 
-local function isKillerNearTarget(targetHrp)
-    if not targetHrp or not targetHrp.Parent then return false end
-    for _, kpos in ipairs(getKillerPositions()) do
-        if (targetHrp.Position - kpos).Magnitude <= SELF_REVIVE_SAFE_RADIUS then
-            return true
-        end
-    end
-    return false
-end
-
-local function getSafeReviveTarget(aliveList)
-    -- Cari target yang killer jauh darinya
-    for _, t in ipairs(aliveList) do
-        if not isKillerNearTarget(t.pHrp) then
-            return t
-        end
-    end
-    return nil  -- semua target dekat killer, skip dulu
-end
-
-local function selfReviveLoop()
-    local lastDecision = 0
-
-    while selfReviveRunning do
-        task.wait(0.5)
-        if not isSelfKnocked() then
-            continue
-        end
-
-        -- Cooldown keputusan (anti flip-flop)
-        local now = tick()
-        if now - lastDecision < REVIVE_DECISION_CD then
-            task.wait(0.3)
-            continue
-        end
-        lastDecision = now
-
-        local alive = getAlivePlayers()
-        if #alive == 0 then continue end
-
-        -- Pilih target aman (killer jauh)
-        local safeTarget = nil
-        for _, t in ipairs(alive) do
-            if not isKillerNearTarget(t.pHrp) then
-                safeTarget = t
-                break
-            end
-        end
-
-        if not safeTarget then
-            GUIPrint("⚠️ Semua teman dekat killer, nunggu...", C.yellow)
-            task.wait(REVIVE_WAIT_DANGER)
-            continue
-        end
-
-        char = player.Character
-        if not char then continue end
-        local myHrp = char:FindFirstChild("HumanoidRootPart")
-        if not myHrp then continue end
-
-        -- Ikutin target sampai revive selesai
-        while selfReviveRunning and isSelfKnocked() do
-            local targetHrp = safeTarget.pHrp
-
-            -- Cek ulang: kalau killer deket target, ganti
-            if isKillerNearTarget(targetHrp) then
-                GUIPrint("⚠️ Killer deket target, cari yang lain...", C.yellow)
-                local newAlive = getAlivePlayers()
-                local newSafe = nil
-                for _, t in ipairs(newAlive) do
-                    if not isKillerNearTarget(t.pHrp) then
-                        newSafe = t
-                        break
-                    end
-                end
-                if newSafe then
-                    safeTarget = newSafe
-                    GUIPrint("🔄 Ganti target revive ke aman", C.cyan)
-                else
-                    task.wait(REVIVE_WAIT_DANGER)
-                end
-            elseif targetHrp and targetHrp.Parent then
-                myHrp.CFrame = CFrame.new(targetHrp.Position)
-            else
-                -- target disconnect/mati
-                local newAlive = getAlivePlayers()
-                local newSafe = nil
-                for _, t in ipairs(newAlive) do
-                    if not isKillerNearTarget(t.pHrp) then
-                        newSafe = t
-                        break
-                    end
-                end
-                if newSafe then safeTarget = newSafe else break end
-            end
-            task.wait(0.3)
-        end
-    end
-end
-
-onTap(selfReviveTgl, function()
-    local val = not getSelfReviveCb()
-    setSelfReviveCb(val)
-    selfReviveRunning = val
-    _G.SelfReviveRunning = val
-    if val then task.spawn(selfReviveLoop)
-    else GUIPrint("🩹 Self-Revive OFF", C.sub) end
-    saveConfig()
-end)
-
-if _G.SelfReviveRunning then
-    selfReviveRunning = true
-    setSelfReviveCb(true)
-    task.spawn(selfReviveLoop)
-end
-
--- ══════════════════════════════════════════════
---  AUTO REVIVE
--- ══════════════════════════════════════════════
--- killerStayTimer[playerName] = tick() pertama kali killer ketahuan deket target itu
-local killerStayTimers = {}
-
-local function isKillerNearReviveTarget(targetHrp)
-    if not targetHrp or not targetHrp.Parent then return false end
-    for _, kpos in ipairs(getKillerPositions()) do
-        if (targetHrp.Position - kpos).Magnitude <= REVIVE_SAFE_RADIUS then
-            return true
-        end
-    end
-    return false
-end
-
+-- ── KNOCKED PLAYER FINDER ──
 local function getKnockedPlayers()
-    local list = {}
-    for _, p in ipairs(game.Players:GetPlayers()) do
-        if p == player then continue end
-        local pChar = p.Character
-        if not pChar then continue end
-        local pHrp = pChar:FindFirstChild("HumanoidRootPart")
-        if not pHrp then continue end
-        local bleed = pHrp:FindFirstChild("BleedOutHealth")
-        if bleed and bleed.Enabled then
-            table.insert(list, { plr = p, pHrp = pHrp })
+    local list={}
+    for _,p in ipairs(game.Players:GetPlayers()) do
+        if p~=player and not isPlayerKiller(p) and p.Character then
+            local ph=p.Character:FindFirstChild("HumanoidRootPart")
+            if ph then
+                local bleed=ph:FindFirstChild("BleedOutHealth")
+                if bleed and bleed.Enabled then
+                    table.insert(list,{plr=p,pHrp=ph})
+                end
+            end
         end
     end
     return list
 end
 
-local function reviveLoop()
-    local lastDecision = 0
+-- ── TELEPORT AWAY FROM KILLER ──
+local FLEE_RADIUS = 20
+local function getTeleportFleePos(killerPos)
+    if not hrp then return nil end
+    local myPos=hrp.Position
+    local awayDir=(myPos-killerPos)
+    if awayDir.Magnitude < 0.1 then awayDir=Vector3.new(1,0,0) end
+    awayDir=Vector3.new(awayDir.X,0,awayDir.Z).Unit
+    local angle=math.rad(math.random(-45,45))
+    local rotated=Vector3.new(
+        awayDir.X*math.cos(angle)-awayDir.Z*math.sin(angle),
+        0,
+        awayDir.X*math.sin(angle)+awayDir.Z*math.cos(angle)
+    )
+    local dist=math.random(40,80)
+    return myPos+rotated*dist+Vector3.new(0,3,0)
+end
 
-    while reviveRunning do
-        task.wait(0.5)
-        char = player.Character
-        if not char then task.wait(1); continue end
-        hrp = char:FindFirstChild("HumanoidRootPart")
-        hum = char:FindFirstChild("Humanoid")
-        if not hrp or not hum or hum.Health <= 0 then task.wait(1); continue end
+-- ════════════════════════════════════════════════
+--  INTENT WRITERS — tiap fitur nulis ke Intent,
+--  TIDAK ada teleport di sini
+-- ════════════════════════════════════════════════
 
-        -- Cooldown keputusan (anti flip-flop)
-        local now = tick()
-        if now - lastDecision < REVIVE_DECISION_CD then
-            task.wait(0.5)
-            continue
+local farmBatch       = {}
+local farmBatchIdx    = 0
+local farmCooldownEnd = 0
+
+local function writeFarmIntent()
+    if not getFarmCb() then Intent.farm.active=false return end
+    if not hrp or not hum or hum.Health<=0 then Intent.farm.active=false return end
+    -- kalau lagi escape, mandor akan override, tapi kita tetap sediakan target
+    -- refresh batch kalau kosong atau index habis
+    if farmBatchIdx >= #farmBatch or #farmBatch==0 then
+        farmBatch=getLootObjects()
+        farmBatchIdx=0
+        updateStats(totalCollected,#farmBatch)
+        if _G.WhEv_Batch and _G.WebhookURL~="" and #farmBatch>0 then
+            pcall(function()
+                game:GetService("HttpService"):PostAsync(_G.WebhookURL,
+                    HS:JSONEncode({content="📦 Batch baru: "..#farmBatch.." loot"}),
+                    Enum.HttpContentType.ApplicationJson)
+            end)
         end
-        lastDecision = now
-
-        local knocked = getKnockedPlayers()
-        if #knocked == 0 then
-            killerStayTimers = {}  -- reset semua timer kalau ga ada yang knocked
-            continue
+    end
+    if #farmBatch==0 then
+        Intent.farm.active=false
+        Intent.farm.label="Farm: loot habis"
+        return
+    end
+    farmBatchIdx=farmBatchIdx+1
+    if farmBatchIdx > #farmBatch then farmBatchIdx=1 end
+    local loot=farmBatch[farmBatchIdx]
+    if not loot then Intent.farm.active=false return end
+    -- killer safe check untuk loot ini
+    if getKillerSCb() then
+        local tooClose,_=isNearKillerCached(loot.pos,FLEE_RADIUS)
+        if tooClose then
+            -- skip loot ini, cari next
+            Intent.farm.active=false
+            Intent.farm.label="Farm: skip (killer deket loot)"
+            return
         end
+    end
+    Intent.farm.active    = true
+    Intent.farm.targetPos = loot.pos + Vector3.new(0,3,0)
+    Intent.farm.label     = "Farm "..farmBatchIdx.."/"..#farmBatch.." — "..loot.name
+    Intent.farm.lootName  = loot.name
+end
 
-        -- ── Pilih target yang aman ───────────────
-        local safeTarget = nil
-        for _, t in ipairs(knocked) do
-            local tName = t.plr.Name
-            local killerNear = isKillerNearReviveTarget(t.pHrp)
+local function writeEscapeIntent()
+    if not getEscapeCb() then Intent.escape.active=false return end
+    if not hrp or not hum or hum.Health<=0 then Intent.escape.active=false return end
+    local sisa=getRoundTimerSecs()
+    -- update timer display selalu
+    if sisa and sisa>0 then
+        local col=sisa>=300 and C.green or sisa>=120 and C.yellow or sisa>=80 and Color3.fromRGB(255,140,80) or C.red
+        timerVal.Text=string.format("%d:%02d",math.floor(sisa/60),sisa%60) timerVal.TextColor3=col
+        escTimerDisp.Text=string.format("%d:%02d",math.floor(sisa/60),sisa%60)
+        -- deteksi round baru
+        if lastTimerSecs and sisa>(lastTimerSecs+30) then
+            hasEscaped=false validTimerTick=0 escapeGuard=false
+        end
+        if lastTimerSecs and sisa<lastTimerSecs then
+            validTimerTick=validTimerTick+1
+        else
+            validTimerTick=0
+        end
+        lastTimerSecs=sisa
+    else
+        timerVal.Text="--:--" timerVal.TextColor3=C.sub
+        escTimerDisp.Text="--:--"
+        lastTimerSecs=nil validTimerTick=0 hasEscaped=false
+        Intent.escape.active=false return
+    end
+    if sisa<=59 and validTimerTick>=3 and not hasEscaped then
+        local exitPos=getExitDoorPos()
+        if exitPos then
+            Intent.escape.active    = true
+            Intent.escape.targetPos = exitPos + Vector3.new(0,0,0)
+            Intent.escape.label     = "Escape! "..sisa.."s"
+        else
+            Intent.escape.active=false
+            Intent.escape.label="Escape: exit ga ketemu"
+        end
+    else
+        Intent.escape.active=false
+    end
+end
 
-            if killerNear then
-                -- Mulai timer bait untuk target ini
-                if not killerStayTimers[tName] then
-                    killerStayTimers[tName] = tick()
+local REVIVE_SAFE_R   = 35
+local REVIVE_BAIT_LIM = 5
+local reviveBaitTimers= {}
+
+local function writeReviveIntent()
+    if not getReviveCb() then Intent.revive.active=false return end
+    if not hrp or not hum or hum.Health<=0 then Intent.revive.active=false return end
+    local knocked=getKnockedPlayers()
+    if #knocked==0 then
+        reviveBaitTimers={} Intent.revive.active=false return
+    end
+    local safeTarget=nil
+    for _,t in ipairs(knocked) do
+        local tName=t.plr.Name
+        -- cek killer dari 2 sudut: posisi target DAN posisi kita sendiri
+        local killerNearTarget,_=isNearKillerCached(t.pHrp.Position,REVIVE_SAFE_R)
+        local killerNearMe,_=isNearKillerCached(hrp.Position,REVIVE_SAFE_R)
+        local killerNear = killerNearTarget or killerNearMe
+        if killerNear then
+            -- catat kapan pertama kali killer deket target ini
+            if not reviveBaitTimers[tName] then reviveBaitTimers[tName]=tick() end
+            -- kalau killer udah nongkrong > REVIVE_BAIT_LIM detik, skip permanen
+            if (tick()-reviveBaitTimers[tName]) > REVIVE_BAIT_LIM then
+                reviveBaitTimers[tName]=tick() -- reset supaya nanti bisa dicoba lagi
+            end
+            -- tetap skip target ini, lanjut ke knocked player berikutnya
+        else
+            reviveBaitTimers[tName]=nil safeTarget=t break
+        end
+    end
+    if not safeTarget then
+        Intent.revive.active=false
+        Intent.revive.label="Revive: semua dijaga killer"
+        return
+    end
+    local dist=(hrp.Position-safeTarget.pHrp.Position).Magnitude
+    local arrivalPos = safeTarget.pHrp.Position + Vector3.new(2,0,0)
+    -- double check: posisi kita setelah teleport juga harus aman
+    local arrivalDanger,_ = isNearKillerCached(arrivalPos, FLEE_RADIUS)
+    if arrivalDanger then
+        Intent.revive.active = false
+        Intent.revive.label  = "Revive: arrival bahaya, skip"
+        return
+    end
+    Intent.revive.active    = true
+    Intent.revive.targetPos = arrivalPos
+    Intent.revive.label     = "Revive "..safeTarget.plr.Name.." ("..math.floor(dist).." studs)"
+end
+
+local SELF_REVIVE_SAFE_R = 25
+
+local function writeSelfReviveIntent()
+    if not getSelfRvCb() then Intent.selfRevive.active=false return end
+    if not isSelfKnocked() then Intent.selfRevive.active=false return end
+    -- cari player hidup & aman
+    local alive={}
+    char=player.Character if not char then Intent.selfRevive.active=false return end
+    local myHrp=char:FindFirstChild("HumanoidRootPart")
+    if not myHrp then Intent.selfRevive.active=false return end
+    local myPos=myHrp.Position
+    for _,p in ipairs(game.Players:GetPlayers()) do
+        if p~=player and not isPlayerKiller(p) and p.Character then
+            local ph=p.Character:FindFirstChild("HumanoidRootPart")
+            local phum=p.Character:FindFirstChild("Humanoid")
+            if ph and phum and phum.Health>0 then
+                -- filter lobby: skip kalau beda Y lebih dari 200 studs (lobby = area terpisah)
+                -- DAN skip kalau total jarak > 500 studs
+                local yDiff = math.abs(ph.Position.Y - myPos.Y)
+                local totalDist = (ph.Position - myPos).Magnitude
+                if yDiff > 200 or totalDist > 500 then continue end
+                local kn,_=isNearKillerCached(ph.Position,SELF_REVIVE_SAFE_R)
+                if not kn then table.insert(alive,{pHrp=ph,name=p.Name}) end
+            end
+        end
+    end
+    if #alive==0 then
+        Intent.selfRevive.active=false
+        Intent.selfRevive.label="SelfRev: semua deket killer"
+        return
+    end
+    local t=alive[1]
+    local arrivalPos = t.pHrp.Position + Vector3.new(2,0,0)
+    -- double check arrival aman
+    local arrivalDanger,_ = isNearKillerCached(arrivalPos, FLEE_RADIUS)
+    if arrivalDanger then
+        Intent.selfRevive.active = false
+        Intent.selfRevive.label  = "SelfRev: arrival bahaya, skip"
+        return
+    end
+    Intent.selfRevive.active    = true
+    Intent.selfRevive.targetPos = arrivalPos
+    Intent.selfRevive.label     = "SelfRev → "..t.name
+end
+
+-- ════════════════════════════════════════════════
+--  MANDOR — MASTER CONTROLLER LOOP
+--  Ini satu-satunya yang boleh teleport
+-- ════════════════════════════════════════════════
+local function updatePrioDisplay(name,col,labelText)
+    prioDot.BackgroundColor3=col
+    prioLbl.Text="Mandor: "..labelText
+    prioLbl.TextColor3=col
+end
+
+_G.PevMasterRunning=true
+task.spawn(function()
+    while _G.PevMasterRunning and sg and sg.Parent do
+        task.wait(0.15)
+
+        -- refresh karakter
+        char=player.Character
+        if not char then task.wait(0.5) continue end
+        hrp=char:FindFirstChild("HumanoidRootPart")
+        hum=char:FindFirstChild("Humanoid")
+        if not hrp or not hum then task.wait(0.5) continue end
+
+        -- 1. Refresh killer cache (satu kali per tick)
+        refreshKillerCache()
+
+        -- 2. Cek apakah player sendiri terlalu dekat killer
+        --    Aktif kalau: KillerSafe toggle ON, ATAU lagi proses revive/selfRevive
+        local doFleeCheck = (getKillerSCb() or isReviving) and hum.Health>0
+        if doFleeCheck then
+            local fleeRadius = isReviving and REVIVE_FLEE_R or FLEE_RADIUS
+            local tooClose,kpos=isNearKillerCached(hrp.Position,fleeRadius)
+            if tooClose and kpos then
+                isReviving = false -- reset flag
+                local fleePos=getTeleportFleePos(kpos)
+                if fleePos then
+                    hrp.CFrame=CFrame.new(fleePos)
+                    if isReviving then
+                        setStatus("🚨 Killer dateng saat revive, kabur!",true)
+                        updatePrioDisplay("FLEE",C.red,"Kabur saat Revive!")
+                    else
+                        setStatus("🚨 Kabur dari killer!",true)
+                        updatePrioDisplay("FLEE",C.red,"Kabur dari Killer!")
+                    end
+                    task.wait(0.4)
                 end
-
-                local stayDur = tick() - killerStayTimers[tName]
-                if stayDur > REVIVE_BAIT_LIMIT then
-                    -- Killer udah nunggu lama di target ini → skip selamanya round ini
-                    GUIPrint("🪤 Killer bait di "..tName..", skip!", C.red)
-                end
-                -- Target ini berbahaya, coba yang lain
-            else
-                -- Killer jauh dari target ini → aman
-                killerStayTimers[tName] = nil  -- reset timer bait kalau killer pergi
-                safeTarget = t
-                break
+                continue -- skip tick ini, jangan ambil intent lain
             end
         end
 
-        -- Kalau semua target berbahaya → farming dulu
-        if not safeTarget then
-            setStatus("⚠️ Semua teman dijaga killer, farming dulu...", true)
-            task.wait(REVIVE_WAIT_DANGER)
-            continue
+        -- 3. Tulis semua intent (tiap fitur update target mereka)
+        writeSelfReviveIntent()
+        writeEscapeIntent()
+        writeReviveIntent()
+        writeFarmIntent()
+
+        -- 4. Pilih intent prioritas tertinggi yang aktif
+        local chosen=nil
+        for _,key in ipairs(PRIORITY_ORDER) do
+            if Intent[key].active and Intent[key].targetPos then
+                chosen=Intent[key] break
+            end
         end
 
-        -- ── Eksekusi revive ke target aman ───────
-        local targetHrp = safeTarget.pHrp
-        if not targetHrp or not targetHrp.Parent then continue end
+        -- 5. Eksekusi — satu teleport, satu status
+        if chosen then
+            -- set flag reviving SEBELUM teleport
+            if chosen==Intent.revive or chosen==Intent.selfRevive then
+                isReviving = true
+            else
+                isReviving = false
+            end
 
-        -- Double-check sebelum teleport
-        if isKillerNearReviveTarget(targetHrp) then
-            setStatus("⚠️ Killer muncul, batal revive!", true)
-            task.wait(REVIVE_WAIT_DANGER)
-            continue
-        end
+            hrp.CFrame=CFrame.new(chosen.targetPos)
+            setStatus("▶ "..chosen.label,true)
+            updatePrioDisplay(chosen.label,
+                chosen==Intent.selfRevive and C.accLt or
+                chosen==Intent.escape     and C.cyan  or
+                chosen==Intent.revive     and C.yellow or C.green,
+                chosen.label)
 
-        local dist = (hrp.Position - targetHrp.Position).Magnitude
-        if dist > 5 then
-            setStatus("💉 Revive "..safeTarget.plr.Name.." ("..math.floor(dist).." studs)", true)
-            GUIPrint("💉 Revive "..safeTarget.plr.Name, C.yellow)
-            hrp.CFrame = CFrame.new(targetHrp.Position + Vector3.new(2, 0, 0))
+            -- POST-TELEPORT SAFETY CHECK — cek sekali lagi setelah tp
+            if chosen==Intent.revive or chosen==Intent.selfRevive then
+                task.wait(0.08)
+                refreshKillerCache()
+                local stillDanger,kpos2=isNearKillerCached(hrp.Position,REVIVE_FLEE_R)
+                if stillDanger and kpos2 then
+                    isReviving = false
+                    local fleePos=getTeleportFleePos(kpos2)
+                    if fleePos then
+                        hrp.CFrame=CFrame.new(fleePos)
+                        setStatus("🚨 Killer dateng saat revive, kabur!",true)
+                        updatePrioDisplay("FLEE",C.red,"Kabur setelah Revive!")
+                        task.wait(0.3)
+                    end
+                end
+                -- isReviving tetap true kalau aman, akan di-reset di tick berikutnya
+                -- kalau killer dateng → step 2 yang handle dan reset
+            end
+            -- kalau ini escape dan berhasil teleport, set flag
+            if chosen==Intent.escape then
+                hasEscaped=true escapeGuard=true
+                setStatus("✅ Escaped — tunggu round berikut",false)
+                updatePrioDisplay("Escaped",C.green,"Escaped ✓")
+                -- webhook
+                if _G.WebhookURL~="" then
+                    pcall(function()
+                        game:GetService("HttpService"):PostAsync(_G.WebhookURL,
+                            HS:JSONEncode({content="🚪 Escaped! Sisa timer: "..math.floor(lastTimerSecs or 0).."s"}),
+                            Enum.HttpContentType.ApplicationJson)
+                    end)
+                end
+            end
+            -- kalau farm, hitung collected & webhook per loot
+            if chosen==Intent.farm then
+                totalCollected=totalCollected+1
+                updateStats(totalCollected,#farmBatch-farmBatchIdx)
+                if _G.WhEv_Loot and _G.WebhookURL~="" then
+                    pcall(function()
+                        game:GetService("HttpService"):PostAsync(_G.WebhookURL,
+                            HS:JSONEncode({content="✅ Loot: `"..(chosen.lootName or "?").."` | Total: "..totalCollected}),
+                            Enum.HttpContentType.ApplicationJson)
+                    end)
+                end
+            end
+        else
+            -- tidak ada yang aktif, pastikan flag reviving direset
+            isReviving = false
+            local anyOn = getFarmCb() or getEscapeCb() or getReviveCb() or getSelfRvCb()
+            if anyOn then
+                setStatus("⌛ Nunggu kondisi...",true)
+                updatePrioDisplay("Wait",C.muted,"Nunggu kondisi...")
+            else
+                setStatus("Idle — menunggu",false)
+                updatePrioDisplay("Idle",C.muted,"Standby")
+            end
         end
     end
-end
+end)
 
-onTap(reviveTgl, function()
-    local val = not getReviveCb()
-    setReviveCb(val)
-    reviveRunning = val
-    _G.ReviveRunning = val
-    if val then task.spawn(reviveLoop)
-    else GUIPrint("💉 Auto Revive OFF", C.sub) end
+-- ══════════════════════════════════════════════
+--  TOGGLE HANDLERS
+-- ══════════════════════════════════════════════
+onTap(farmTgl,function()
+    local v=not getFarmCb() setFarmCb(v) _G.FarmOn=v
+    farmBatch={} farmBatchIdx=0
+    if not v then Intent.farm.active=false end
     saveConfig()
 end)
-
-if _G.ReviveRunning then
-    reviveRunning = true
-    setReviveCb(true)
-    task.spawn(reviveLoop)
-end
-
--- ══════════════════════════════════════════════
---  CHARACTER RE-APPLY (speed/jump persist saat respawn)
--- ══════════════════════════════════════════════
-player.CharacterAdded:Connect(function(c)
-    char = c
-    hrp  = c:WaitForChild("HumanoidRootPart")
-    hum  = c:WaitForChild("Humanoid")
-    if getSpeedCb() then task.wait(0.5); hum.WalkSpeed = _G.SpeedValue end
-    if getJumpCb()  then task.wait(0.5); hum.JumpPower = _G.JumpValue  end
+onTap(escapeTgl,function()
+    local v=not getEscapeCb() setEscapeCb(v) _G.EscapeOn=v
+    if not v then Intent.escape.active=false hasEscaped=false end
+    saveConfig()
+end)
+onTap(reviveTgl,function()
+    local v=not getReviveCb() setReviveCb(v) _G.ReviveOn=v
+    if not v then Intent.revive.active=false end
+    saveConfig()
+end)
+onTap(selfRvTgl,function()
+    local v=not getSelfRvCb() setSelfRvCb(v) _G.SelfReviveOn=v
+    if not v then Intent.selfRevive.active=false end
+    saveConfig()
+end)
+onTap(killerSTgl,function()
+    local v=not getKillerSCb() setKillerSCb(v) _G.KillerSafeOn=v saveConfig()
 end)
 
 -- ══════════════════════════════════════════════
---  MINIMIZE & BUBBLE
+--  AUTO KILL (tetap sendiri — tidak konflik
+--  karena kill bukan teleport DIRI kita)
 -- ══════════════════════════════════════════════
-onTap(minimizeBtn, function()
-    win.Visible = false
-    bubble.Visible = true
-end)
-
-onTap(bubble, function()
-    bubble.Visible = false
-    win.Visible = true
-end)
-
--- ══════════════════════════════════════════════
---  CLOSE
--- ══════════════════════════════════════════════
-onTap(closeBtn, function()
-    running           = false
-    escapeRunning     = false
-    _G.EscapeRunning   = false
-    reviveRunning     = false
-    killRunning       = false
-    selfReviveRunning = false
-    _G.FarmRunning     = false
-    _G.ReviveRunning   = false
-    _G.KillRunning     = false
-    _G.SelfReviveRunning = false
-    local c = player.Character
-    if c then
-        local h = c:FindFirstChild("Humanoid")
-        if h then
-            if getSpeedCb() then h.WalkSpeed = 16 end
-            if getJumpCb()  then h.JumpPower = 7.2 end
+local killRunning=false
+local function killLoop()
+    while killRunning do
+        task.wait(0.5)
+        char=player.Character if not char then task.wait(1) end
+        if not char then killRunning=not killRunning break end
+        hrp=char:FindFirstChild("HumanoidRootPart")
+        hum=char:FindFirstChild("Humanoid")
+        if not hrp or not hum or hum.Health<=0 then task.wait(1)
+        elseif not isKillerRole() then task.wait(1)
+        else
+            local targets={}
+            for _,p in ipairs(game.Players:GetPlayers()) do
+                if p~=player and not isPlayerKiller(p) and p.Character then
+                    local ph=p.Character:FindFirstChild("HumanoidRootPart")
+                    local phum=p.Character:FindFirstChild("Humanoid")
+                    if ph and phum and phum.Health>0 then table.insert(targets,{pHrp=ph}) end
+                end
+            end
+            if #targets>0 then
+                local myLook=hrp.CFrame.LookVector
+                local stackPos=hrp.Position+myLook*1.5+Vector3.new(0,0.5,0)
+                for _,t in ipairs(targets) do
+                    pcall(function() t.pHrp.CFrame=CFrame.new(stackPos,stackPos+myLook) end)
+                end
+            end
+            task.wait(0.3)
         end
     end
-    if djConn then djConn:Disconnect() djConn = nil end
-    if afkConn then afkConn:Disconnect() afkConn = nil end
-    for espType in pairs(espActive) do
-        espActive[espType] = false
-        clearESP(espType)
-    end
-    sg:Destroy()
-    _G.PevGui = nil
+end
+onTap(killTgl,function()
+    local v=not getKillCb() setKillCb(v) killRunning=v _G.KillOn=v
+    if v then task.spawn(killLoop) end saveConfig()
 end)
 
 -- ══════════════════════════════════════════════
---  INIT — semua pages udah dibuat, baru switchTab
+--  SPEED / JUMP / DOUBLE JUMP
 -- ══════════════════════════════════════════════
-switchTab("Main")
-setStatus("Idle — menunggu", false)
+local djConn=nil
+onTap(speedTgl,function()
+    local v=not getSpeedCb() setSpeedCb(v) _G.SpeedOn=v
+    if hum then hum.WalkSpeed=v and _G.SpeedVal or 16 end saveConfig()
+end)
+onTap(jumpTgl,function()
+    local v=not getJumpCb() setJumpCb(v) _G.JumpOn=v
+    if hum then hum.JumpPower=v and _G.JumpVal or 7.2 end saveConfig()
+end)
+onTap(djTgl,function()
+    local v=not getDJCb() setDJCb(v) _G.DJOn=v
+    if djConn then djConn:Disconnect() djConn=nil end
+    if v then
+        djConn=game:GetService("UserInputService").JumpRequest:Connect(function()
+            if hum and hum:GetState()==Enum.HumanoidStateType.Freefall then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end)
+    end
+    saveConfig()
+end)
+if _G.SpeedOn then setSpeedCb(true) if hum then hum.WalkSpeed=_G.SpeedVal end end
+if _G.JumpOn  then setJumpCb(true)  if hum then hum.JumpPower=_G.JumpVal  end end
 
-if _G.FarmRunning then
-    running = true
-    setFarmCb(true)
-    task.spawn(farmLoop)
-end
-
-task.spawn(function()
-    while task.wait(10) do
-        pcall(function()
-            local c = player.Character
-            if not c then return end
-            local h = c:FindFirstChild("Humanoid")
-            if not h or h.Health <= 0 then return end
-            h:ChangeState(Enum.HumanoidStateType.Jumping)
+-- ══════════════════════════════════════════════
+--  AFK
+-- ══════════════════════════════════════════════
+onTap(afkTgl,function()
+    local v=not getAfkCb() setAfkCb(v)
+    if afkConn then afkConn:Disconnect() afkConn=nil end
+    if v then
+        afkConn=game:GetService("RunService").Heartbeat:Connect(function()
+            pcall(function()
+                local c=player.Character if not c then return end
+                local h=c:FindFirstChild("Humanoid") if not h or h.Health<=0 then return end
+                h:ChangeState(Enum.HumanoidStateType.Jumping)
+            end)
         end)
     end
 end)
 
--- timer kotak ke-3 (fungsi getDigitSTK sudah di-declare di atas)
+-- ══════════════════════════════════════════════
+--  AUTO FLEE REALTIME (saat reviving, tanpa toggle)
+--  Killer mendekat saat kita revive → langsung kabur
+-- ══════════════════════════════════════════════
+local REVIVE_FLEE_R = 22  -- radius deteksi killer saat lagi reviving
+task.spawn(function()
+    while sg and sg.Parent do
+        task.wait(0.1)
+        if not isReviving then continue end
+        char=player.Character if not char then continue end
+        local myHrp=char:FindFirstChild("HumanoidRootPart") if not myHrp then continue end
+        refreshKillerCache()
+        local danger,kpos=isNearKillerCached(myHrp.Position,REVIVE_FLEE_R)
+        if danger and kpos then
+            isReviving=false  -- reset dulu biar ga loop
+            local fleePos=getTeleportFleePos(kpos)
+            if fleePos then
+                myHrp.CFrame=CFrame.new(fleePos)
+                setStatus("🚨 Kabur! Killer deket saat revive",true)
+                updatePrioDisplay("FLEE",C.red,"Auto Flee — Revive interrupted")
+            end
+        end
+    end
+end)
 
+-- ══════════════════════════════════════════════
+--  AUTO BREAK TRAP (otomatis, tanpa toggle)
+--  Deteksi jika kena perangkap killer STK
+--  → spam teleport kecil + ChangeState buat lepas
+-- ══════════════════════════════════════════════
+local trapBreakActive = false
+task.spawn(function()
+    while sg and sg.Parent do
+        task.wait(0.12)
+        char=player.Character if not char then continue end
+        local myHrp=char:FindFirstChild("HumanoidRootPart") if not myHrp then continue end
+        local myHum=char:FindFirstChild("Humanoid") if not myHum or myHum.Health<=0 then continue end
+
+        -- deteksi trap: cek attribute, gui, atau object trap di karakter
+        local trapped=false
+        -- metode 1: attribute
+        if char:GetAttribute("Trapped")==true then trapped=true end
+        if char:GetAttribute("IsCaught")==true then trapped=true end
+        if player:GetAttribute("Trapped")==true then trapped=true end
+        -- metode 2: BillboardGui trap di karakter
+        if not trapped then
+            for _,v in ipairs(char:GetDescendants()) do
+                if (v:IsA("BillboardGui") or v:IsA("ScreenGui")) then
+                    local n=v.Name:lower()
+                    if (n:find("trap") or n:find("caught") or n:find("snare") or n:find("cage")) and v.Enabled then
+                        trapped=true break
+                    end
+                end
+            end
+        end
+        -- metode 3: cek object trap nempel di karakter (BasePart dengan nama trap)
+        if not trapped then
+            for _,v in ipairs(char:GetChildren()) do
+                if v:IsA("BasePart") then
+                    local n=v.Name:lower()
+                    if n:find("trap") or n:find("snare") or n:find("net") then
+                        trapped=true break
+                    end
+                end
+            end
+        end
+
+        if trapped and not trapBreakActive then
+            trapBreakActive=true
+            setStatus("🪤 Kena trap! Lagi lepas...",true)
+            updatePrioDisplay("TRAP",C.yellow,"Breaking trap...")
+            -- spam escape: ChangeState + micro-teleport random buat lepas
+            for i=1,8 do
+                task.wait(0.05)
+                pcall(function()
+                    myHum:ChangeState(Enum.HumanoidStateType.Jumping)
+                    local rng=Vector3.new(math.random(-3,3),2,math.random(-3,3))
+                    myHrp.CFrame=CFrame.new(myHrp.Position+rng)
+                end)
+                -- cek lagi, kalau udah lepas stop
+                char=player.Character if not char then break end
+                myHrp=char:FindFirstChild("HumanoidRootPart") if not myHrp then break end
+                myHum=char:FindFirstChild("Humanoid") if not myHum then break end
+                if char:GetAttribute("Trapped")~=true and char:GetAttribute("IsCaught")~=true then break end
+            end
+            trapBreakActive=false
+        end
+    end
+end)
+
+-- ══════════════════════════════════════════════
+--  CHARACTER RESPAWN
+-- ══════════════════════════════════════════════
+player.CharacterAdded:Connect(function(c)
+    char=c hrp=c:WaitForChild("HumanoidRootPart") hum=c:WaitForChild("Humanoid")
+    -- reset escape guard saat respawn (round baru)
+    hasEscaped=false escapeGuard=false validTimerTick=0
+    farmBatch={} farmBatchIdx=0
+    if getSpeedCb() then task.wait(0.5) hum.WalkSpeed=_G.SpeedVal end
+    if getJumpCb()  then task.wait(0.5) hum.JumpPower=_G.JumpVal  end
+end)
+
+-- ══════════════════════════════════════════════
+--  ESCAPE STATUS DISPLAY LOOP (UI only, no tp)
+-- ══════════════════════════════════════════════
 task.spawn(function()
     while sg and sg.Parent do
         task.wait(0.5)
-        local sisa, display = nil, nil
-        pcall(function()
-            local t = player.PlayerGui.TopBar.RoundTimer
-            local m1 = getDigitSTK(t.Minute1.InnerBox.Numbers)
-            local m2 = getDigitSTK(t.Minute2.InnerBox.Numbers)
-            local s1 = getDigitSTK(t.Second1.InnerBox.Numbers)
-            local s2 = getDigitSTK(t.Second2.InnerBox.Numbers)
-            sisa    = (m1*10+m2)*60 + (s1*10+s2)
-            display = string.format("%d%d:%d%d", m1, m2, s1, s2)
-        end)
-        if sisa and display and sisa > 0 then
-            local col
-            if sisa >= 300 then
-                col = C.green
-            elseif sisa >= 120 then
-                col = C.yellow
-            elseif sisa >= 80 then
-                col = Color3.fromRGB(255,140,80)
+        local sisa=lastTimerSecs
+        if sisa and sisa>0 then
+            if hasEscaped then
+                escDotDisp.BackgroundColor3=C.green escStatusLbl.Text="Sudah Escape ✓"
+                escStatusLbl.TextColor3=C.green escTimerDisp.TextColor3=C.green
+            elseif sisa<=59 then
+                escDotDisp.BackgroundColor3=C.green escStatusLbl.Text="Waktunya Escape!"
+                escStatusLbl.TextColor3=C.green escTimerDisp.TextColor3=C.green
+            elseif sisa<=120 then
+                escDotDisp.BackgroundColor3=C.yellow escStatusLbl.Text="Sebentar lagi..."
+                escStatusLbl.TextColor3=C.yellow escTimerDisp.TextColor3=C.yellow
             else
-                col = C.red
-            end
-            timerVal.Text = display
-            timerVal.TextColor3 = col
-
-            -- Update escape status card (pakai escapeSuccess flag dari escapeLoop)
-            escTimerDisp.Text = display
-            if escapeSuccess then
-                escDotDisp.BackgroundColor3 = C.green
-                escStatusLbl.Text = "Sudah Escape ✓"
-                escStatusLbl.TextColor3 = C.green
-                escTimerDisp.TextColor3 = C.green
-            elseif sisa <= 59 then
-                escDotDisp.BackgroundColor3 = C.green
-                escStatusLbl.Text = "Waktunya Escape!"
-                escStatusLbl.TextColor3 = C.green
-                escTimerDisp.TextColor3 = C.green
-            elseif sisa <= 120 then
-                escDotDisp.BackgroundColor3 = C.yellow
-                escStatusLbl.Text = "Sebentar lagi..."
-                escStatusLbl.TextColor3 = C.yellow
-                escTimerDisp.TextColor3 = C.yellow
-            else
-                escDotDisp.BackgroundColor3 = C.red
-                escStatusLbl.Text = "Belum Escape"
-                escStatusLbl.TextColor3 = C.sub
-                escTimerDisp.TextColor3 = C.cyan
+                escDotDisp.BackgroundColor3=C.red escStatusLbl.Text="Belum Escape"
+                escStatusLbl.TextColor3=C.sub escTimerDisp.TextColor3=C.cyan
             end
         else
-            timerVal.Text = "--:--"
-            timerVal.TextColor3 = C.sub
-            escTimerDisp.Text = "--:--"
-            escTimerDisp.TextColor3 = C.sub
-            escDotDisp.BackgroundColor3 = C.muted
-            escStatusLbl.Text = "Menunggu round..."
-            escStatusLbl.TextColor3 = C.sub
+            escDotDisp.BackgroundColor3=C.muted escStatusLbl.Text="Menunggu round..."
+            escStatusLbl.TextColor3=C.sub escTimerDisp.TextColor3=C.sub
         end
     end
 end)
+
+-- ══════════════════════════════════════════════
+--  RESTORE TOGGLES FROM CONFIG
+-- ══════════════════════════════════════════════
+if _G.FarmOn      then setFarmCb(true)    end
+if _G.EscapeOn    then setEscapeCb(true)  end
+if _G.ReviveOn    then setReviveCb(true)  end
+if _G.SelfReviveOn then setSelfRvCb(true) end
+if _G.KillerSafeOn then setKillerSCb(true) end
+if _G.KillOn      then setKillCb(true) killRunning=true task.spawn(killLoop) end
+
+-- ══════════════════════════════════════════════
+--  MINIMIZE / CLOSE
+-- ══════════════════════════════════════════════
+onTap(minBtn,function() win.Visible=false bubble.Visible=true end)
+onTap(bubble,function() bubble.Visible=false win.Visible=true end)
+onTap(closeBtn,function()
+    _G.PevMasterRunning=false killRunning=false
+    if djConn  then djConn:Disconnect()  djConn=nil  end
+    if afkConn then afkConn:Disconnect() afkConn=nil end
+    if espConn then espConn:Disconnect() espConn=nil end
+    for t in pairs(espActive) do espActive[t]=false clearESP(t) end
+    local c=player.Character
+    if c then
+        local h=c:FindFirstChild("Humanoid") if h then
+            if getSpeedCb() then h.WalkSpeed=16 end
+            if getJumpCb()  then h.JumpPower=7.2 end
+        end
+    end
+    sg:Destroy() _G.PevGui=nil
+end)
+
+-- ══════════════════════════════════════════════
+--  INIT
+-- ══════════════════════════════════════════════
+switchTab("Main")
+setStatus("Idle — menunggu",false)
+updatePrioDisplay("Idle",C.muted,"Standby")
