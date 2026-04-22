@@ -623,6 +623,27 @@ local function refreshKillerCache()
     if (tick()-KillerCache.lastUpdate) < KillerCache.INTERVAL then return end
     KillerCache.lastUpdate = tick()
     KillerCache.positions  = {}
+
+    -- Metode 1: cari via Players list (paling reliable di STK)
+    -- killer = player dengan team "Killer" atau attribute IsKiller
+    for _,p in ipairs(game.Players:GetPlayers()) do
+        local isKiller = false
+        if p.Team then
+            local tn = p.Team.Name:lower()
+            if tn:find("killer") or tn:find("monster") then isKiller = true end
+        end
+        if p:GetAttribute("IsKiller") == true then isKiller = true end
+        if p:GetAttribute("Role") then
+            local r = tostring(p:GetAttribute("Role")):lower()
+            if r:find("killer") or r:find("monster") then isKiller = true end
+        end
+        if isKiller and p.Character then
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
+            if root then table.insert(KillerCache.positions, root.Position) end
+        end
+    end
+
+    -- Metode 2: fallback scan workspace nama model (buat NPC killer)
     for _,obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") and obj:FindFirstChild("Humanoid") then
             local n=obj.Name:lower()
@@ -764,8 +785,15 @@ end
 local function isSelfKnocked()
     char=player.Character if not char then return false end
     local myHum=char:FindFirstChild("Humanoid")
-    if myHum and myHum.Health<=0 then return true end
     local myHrp=char:FindFirstChild("HumanoidRootPart")
+
+    -- Cek 1: Health 0
+    if myHum and myHum.Health <= 0 then return true end
+
+    -- Cek 2: Dead state
+    if myHum and myHum:GetState()==Enum.HumanoidStateType.Dead then return true end
+
+    -- Cek 3: BleedOutHealth di HumanoidRootPart
     if myHrp then
         local bleed=myHrp:FindFirstChild("BleedOutHealth")
         if bleed then
@@ -773,21 +801,34 @@ local function isSelfKnocked()
             if bleed:IsA("BoolValue") and bleed.Value then return true end
         end
     end
+
+    -- Cek 4: BleedOutHealth di seluruh char (recursive)
     local bleed2=char:FindFirstChild("BleedOutHealth",true)
     if bleed2 then
         if (bleed2:IsA("BillboardGui") or bleed2:IsA("ScreenGui")) and bleed2.Enabled then return true end
         if bleed2:IsA("BoolValue") and bleed2.Value then return true end
     end
+
+    -- Cek 5: GUI knocked di PlayerGui — scan semua nama yang mungkin
     local ok,bleedGui=pcall(function()
-        return player.PlayerGui:FindFirstChild("BleedOutGui",true)
-            or player.PlayerGui:FindFirstChild("BleedOut",true)
-            or player.PlayerGui:FindFirstChild("KnockedGui",true)
+        local pg = player.PlayerGui
+        for _,v in ipairs(pg:GetDescendants()) do
+            if (v:IsA("ScreenGui") or v:IsA("Frame") or v:IsA("BillboardGui")) and v.Enabled then
+                local n = v.Name:lower()
+                if n:find("bleed") or n:find("knock") or n:find("down") or n:find("revive") then
+                    return v
+                end
+            end
+        end
+        return nil
     end)
-    if ok and bleedGui and bleedGui.Enabled then return true end
+    if ok and bleedGui then return true end
+
+    -- Cek 6: Attribute
     if player:GetAttribute("Knocked")==true then return true end
     if player:GetAttribute("IsKnocked")==true then return true end
     if char:GetAttribute("Knocked")==true then return true end
-    if myHum and myHum:GetState()==Enum.HumanoidStateType.Dead then return true end
+
     return false
 end
 
