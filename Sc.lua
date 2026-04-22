@@ -1203,7 +1203,7 @@ local function killLoop()
             end
             if #targets>0 then
                 local myLook=hrp.CFrame.LookVector
-                local stackPos=hrp.Position+myLook*1.5+Vector3.new(0,0.5,0)
+                local stackPos=hrp.Position+myLook*4+Vector3.new(0,0.5,0)
                 for _,t in ipairs(targets) do
                     pcall(function() t.pHrp.CFrame=CFrame.new(stackPos,stackPos+myLook) end)
                 end
@@ -1246,16 +1246,18 @@ if _G.JumpOn  then setJumpCb(true)  if hum then hum.JumpPower=_G.JumpVal  end en
 
 -- ══════════════════════════════════════════════
 --  AFK
+--  Pake VirtualUser + Idled event — karakter diem,
+--  ga jump, ga jalan, cukup simulate input biar ga ke-kick
 -- ══════════════════════════════════════════════
+local VU = game:GetService("VirtualUser")
 onTap(afkTgl,function()
     local v=not getAfkCb() setAfkCb(v)
     if afkConn then afkConn:Disconnect() afkConn=nil end
     if v then
-        afkConn=game:GetService("RunService").Heartbeat:Connect(function()
+        afkConn=player.Idled:Connect(function()
             pcall(function()
-                local c=player.Character if not c then return end
-                local h=c:FindFirstChild("Humanoid") if not h or h.Health<=0 then return end
-                h:ChangeState(Enum.HumanoidStateType.Jumping)
+                VU:CaptureController()
+                VU:ClickButton2(Vector2.new(0,0))
             end)
         end)
     end
